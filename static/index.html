@@ -84,8 +84,16 @@
   .keyform input { flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--page); color: var(--ink); font: inherit; font-size: 0.82rem; font-family: ui-monospace, "SF Mono", Consolas, monospace; }
   .keyform input.orglabel { flex: 0 1 110px; min-width: 90px; font-family: inherit; }
   .prov.org { padding-left: 26px; }
-  .prov.org .nm { font-weight: 500; }
+  .prov.org .nm { font-weight: 500; cursor: pointer; }
+  .prov.org .nm .arrow { display: inline-block; width: 14px; color: var(--muted); font-size: 0.7rem; }
   .prov .addorg { font-size: 0.74rem; padding: 4px 10px; }
+  .projbox { padding: 2px 0 8px 44px; border-bottom: 1px solid var(--grid); }
+  .projbox:last-child { border-bottom: none; }
+  .projrow { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0 2px; font-size: 0.85rem; font-weight: 600; }
+  .projrow .v { font-variant-numeric: tabular-nums; }
+  .mline { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0 2px 14px; font-size: 0.76rem; color: var(--ink-2); }
+  .mline .mnm { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mline .mv { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .legend { display: flex; gap: 14px; font-size: 0.76rem; color: var(--ink-2); margin-bottom: 8px; flex-wrap: wrap; }
   .legend .key { display: inline-flex; align-items: center; gap: 6px; }
   .legend .sw { width: 10px; height: 10px; border-radius: 3px; }
@@ -239,8 +247,9 @@
   try { token = localStorage.getItem("tokenbill-token"); } catch (e) {}
 
   // 서버 데이터 캐시
-  var me = null, providers = [], daily = [], modelRows = [];
+  var me = null, providers = [], daily = [], modelRows = [], breakdown = [];
   var modelView = "cost";
+  var expandedOrgs = {};  // key_id → true (프로젝트 드릴다운 펼침 상태)
 
   // ── API helper ──
   function api(path, opts) {
@@ -295,9 +304,10 @@
   // ── dashboard data ──
   function refreshAll() {
     return Promise.all([
-      api("/api/me"), api("/api/providers"), api("/api/usage/daily?days=45"), api("/api/usage/models")
+      api("/api/me"), api("/api/providers"), api("/api/usage/daily?days=45"), api("/api/usage/models"),
+      api("/api/usage/breakdown")
     ]).then(function (rs) {
-      me = rs[0]; providers = rs[1]; daily = rs[2]; modelRows = rs[3];
+      me = rs[0]; providers = rs[1]; daily = rs[2]; modelRows = rs[3]; breakdown = rs[4];
       render();
     }).catch(function (e) { toast(e.message); });
   }
@@ -365,8 +375,30 @@
     disconnect: function (keyId) {
       api("/api/providers/" + keyId, { method: "DELETE" })
         .then(refreshAll).catch(function (e) { toast(e.message); });
+    },
+    toggleOrg: function (keyId) {
+      expandedOrgs[keyId] = !expandedOrgs[keyId];
+      render();
     }
   };
+
+  // 키(조직)별 이번 달 breakdown → [{name, cost, models:[{model, cost, inTok, outTok}]}]
+  function projectsOfKey(keyId) {
+    var byProj = {};
+    breakdown.forEach(function (r) {
+      if (r.key_id !== keyId) return;
+      var pid = r.project_id || "__default__";
+      var p = byProj[pid] = byProj[pid] || { name: r.project_name || (r.project_id ? r.project_id : "기본 프로젝트"), cost: 0, models: [] };
+      p.cost += r.cost_usd;
+      p.models.push({ model: r.model, cost: r.cost_usd, inTok: r.input_tokens, outTok: r.output_tokens });
+    });
+    var out = Object.keys(byProj).map(function (k) {
+      byProj[k].models.sort(function (a, b) { return b.cost - a.cost; });
+      return byProj[k];
+    });
+    out.sort(function (a, b) { return b.cost - a.cost; });
+    return out;
+  }
 
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
@@ -492,11 +524,30 @@
           '<button class="btn ghost addorg" onclick="tokenbill.showKeyForm(\'' + p.provider + '\')" aria-label="' + meta.name + ' 조직 추가" title="조직 추가">+</button></div>';
         var orgs = p.keys.map(function (k) {
           var err = k.status && k.status.indexOf("error:") === 0 ? k.status.slice(6).trim() : null;
-          return '<div class="prov org">' +
-            '<div class="nm" title="' + esc(k.key_masked || "") + '">' + esc(k.label) +
+          var open = !!expandedOrgs[k.id];
+          var html = '<div class="prov org">' +
+            '<div class="nm" title="' + esc(k.key_masked || "") + '" onclick="tokenbill.toggleOrg(' + k.id + ')">' +
+            '<span class="arrow">' + (open ? '▾' : '▸') + '</span>' + esc(k.label) +
             (err ? '<span class="err">' + esc(err) + '</span>' : '') + '</div>' +
             '<div class="amt">' + fmt(k.month_cost_usd) + '</div>' +
             '<button class="btn ghost" onclick="tokenbill.disconnect(' + k.id + ')">해제</button></div>';
+          if (open) {
+            var projs = projectsOfKey(k.id);
+            if (!projs.length) {
+              html += '<div class="projbox"><p class="empty" style="padding:8px 0">이번 달 사용 내역이 없습니다.</p></div>';
+            } else {
+              html += projs.map(function (pr) {
+                return '<div class="projbox">' +
+                  '<div class="projrow"><span>' + esc(pr.name) + '</span><span class="v">' + fmt(pr.cost) + '</span></div>' +
+                  pr.models.map(function (m) {
+                    return '<div class="mline"><span class="mnm">' + esc(m.model) + '</span>' +
+                      '<span class="mv">' + fmt(m.cost) + ' · ' + fmtTok(m.inTok + m.outTok) + ' tok</span></div>';
+                  }).join("") +
+                  '</div>';
+              }).join("");
+            }
+          }
+          return html;
         }).join("");
         return head + orgs + keyform;
       }

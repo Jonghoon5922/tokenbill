@@ -186,6 +186,28 @@ def usage_models(user: models.User = Depends(current_user), db: Session = Depend
     ]
 
 
+@app.get("/api/usage/breakdown")
+def usage_breakdown(user: models.User = Depends(current_user), db: Session = Depends(get_db)):
+    """이번 달 키(조직) × 프로젝트 × 모델 분해 — 대시보드 드릴다운용."""
+    month_start = date.today().replace(day=1)
+    rows = db.query(
+        models.UsageDaily.key_id, models.UsageDaily.provider,
+        models.UsageDaily.project_id, models.UsageDaily.project_name, models.UsageDaily.model,
+        func.sum(models.UsageDaily.cost_usd),
+        func.sum(models.UsageDaily.input_tokens), func.sum(models.UsageDaily.output_tokens),
+    ).filter(
+        models.UsageDaily.user_id == user.id, models.UsageDaily.day >= month_start,
+    ).group_by(
+        models.UsageDaily.key_id, models.UsageDaily.provider,
+        models.UsageDaily.project_id, models.UsageDaily.project_name, models.UsageDaily.model,
+    ).all()
+    return [
+        {"key_id": k, "provider": p, "project_id": pid, "project_name": pname, "model": m,
+         "cost_usd": round(c, 4), "input_tokens": int(i), "output_tokens": int(o)}
+        for k, p, pid, pname, m, c, i, o in rows
+    ]
+
+
 # ── 정적 프론트엔드 ─────────────────────────────────────────
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

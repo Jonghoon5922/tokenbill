@@ -46,8 +46,10 @@ class UsageDaily(Base):
     key_id: Mapped[int | None] = mapped_column(ForeignKey("provider_keys.id"), index=True, nullable=True)
     day: Mapped[date] = mapped_column(Date, index=True)
     provider: Mapped[str] = mapped_column(String(32))
+    project_id: Mapped[str | None] = mapped_column(String(64), nullable=True)    # OpenAI project / Anthropic workspace
+    project_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     model: Mapped[str] = mapped_column(String(128))
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     input_tokens: Mapped[int] = mapped_column(Integer, default=0)
     output_tokens: Mapped[int] = mapped_column(Integer, default=0)
-    __table_args__ = (UniqueConstraint("user_id", "key_id", "day", "provider", "model", name="uq_usage_row"),)
+    __table_args__ = (UniqueConstraint("user_id", "key_id", "day", "provider", "project_id", "model", name="uq_usage_row"),)

@@ -41,7 +41,8 @@ def sync_user(db: Session, user: models.User) -> list[dict]:
             )
             for r in rows:
                 db.add(models.UsageDaily(
-                    user_id=user.id, key_id=key.id, day=r["day"], provider=key.provider, model=r["model"],
+                    user_id=user.id, key_id=key.id, day=r["day"], provider=key.provider,
+                    project_id=r.get("project_id"), project_name=r.get("project_name"), model=r["model"],
                     cost_usd=r["cost_usd"], input_tokens=r["input_tokens"], output_tokens=r["output_tokens"],
                 ))
             key.last_status = "ok"

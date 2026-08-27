@@ -30,10 +30,11 @@ def init_db():
                 # SQLite는 rename 후에도 인덱스 이름이 유지되어 create_all과 충돌 → 미리 제거
                 conn.exec_driver_sql("DROP INDEX IF EXISTS ix_provider_keys_user_id")
             ud_cols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(usage_daily)")]
-            if ud_cols and "key_id" not in ud_cols:
+            if ud_cols and ("key_id" not in ud_cols or "project_id" not in ud_cols):
                 conn.exec_driver_sql("ALTER TABLE usage_daily RENAME TO usage_daily_old")
                 conn.exec_driver_sql("DROP INDEX IF EXISTS ix_usage_daily_user_id")
                 conn.exec_driver_sql("DROP INDEX IF EXISTS ix_usage_daily_day")
+                conn.exec_driver_sql("DROP INDEX IF EXISTS ix_usage_daily_key_id")
 
     Base.metadata.create_all(engine)
 
@@ -48,12 +49,15 @@ def init_db():
                     "FROM provider_keys_old")
                 conn.exec_driver_sql("DROP TABLE provider_keys_old")
             if "usage_daily_old" in olds:
-                # 기존 요약 행은 (user, provider)당 키가 1개였으므로 그 키에 귀속시킨다
+                old_cols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(usage_daily_old)")]
+                # v2(key_id 있음)면 그대로, v1이면 (user, provider)당 키가 1개였으므로 그 키에 귀속
+                key_expr = "u.key_id" if "key_id" in old_cols else "k.id"
+                join = "" if "key_id" in old_cols else \
+                    "LEFT JOIN provider_keys k ON k.user_id = u.user_id AND k.provider = u.provider "
                 conn.exec_driver_sql(
-                    "INSERT INTO usage_daily (id, user_id, key_id, day, provider, model, cost_usd, input_tokens, output_tokens) "
-                    "SELECT u.id, u.user_id, k.id, u.day, u.provider, u.model, u.cost_usd, u.input_tokens, u.output_tokens "
-                    "FROM usage_daily_old u "
-                    "LEFT JOIN provider_keys k ON k.user_id = u.user_id AND k.provider = u.provider")
+                    "INSERT INTO usage_daily (id, user_id, key_id, day, provider, project_id, project_name, model, cost_usd, input_tokens, output_tokens) "
+                    f"SELECT u.id, u.user_id, {key_expr}, u.day, u.provider, NULL, NULL, u.model, u.cost_usd, u.input_tokens, u.output_tokens "
+                    f"FROM usage_daily_old u {join}")
                 conn.exec_driver_sql("DROP TABLE usage_daily_old")
 
 

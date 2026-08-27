@@ -1,8 +1,9 @@
 """프로바이더별 사용량 수집기.
 
 각 수집기는 (api_key, start, end)를 받아
-[{"day": date, "model": str, "input_tokens": int, "output_tokens": int, "cost_usd": float}, …]
-를 반환한다.
+[{"day": date, "model": str, "project_id": str|None, "project_name": str|None,
+  "input_tokens": int, "output_tokens": int, "cost_usd": float}, …]
+를 반환한다. project는 OpenAI의 프로젝트, Anthropic의 워크스페이스에 해당한다.
 
 - OpenAI / Anthropic 모두 '조직 관리자(Admin) 키'가 필요하다 (일반 sk- 키로는 사용량 조회 불가).
 - 키가 "demo"로 시작하면 실제 호출 없이 데모 데이터를 생성한다 (시연·개발용).
@@ -32,22 +33,27 @@ DEMO_MODELS = {
 }
 
 
+DEMO_PROJECTS = [("demo-proj-a", "데모 프로젝트 A"), ("demo-proj-b", "데모 프로젝트 B")]
+
+
 def collect_demo(provider: str, start: date, end: date, seed: str = "demo") -> list[dict]:
     rng = random.Random(f"{provider}-{seed}")
     rows = []
     d = start
     while d <= end:
         weekend = d.weekday() >= 5
-        for model in DEMO_MODELS.get(provider, ["demo-model"]):
-            base = rng.uniform(0.2, 1.5) * (0.4 if weekend else 1.0)
-            spike = rng.uniform(2.5, 4.0) if rng.random() > 0.96 else 1.0
-            in_tok = int(base * spike * rng.uniform(0.3, 0.5) * 1e6)
-            out_tok = int(base * spike * rng.uniform(0.05, 0.12) * 1e6)
-            rows.append({
-                "day": d, "model": model,
-                "input_tokens": in_tok, "output_tokens": out_tok,
-                "cost_usd": round(estimate_cost(model, in_tok, out_tok), 4),
-            })
+        for pid, pname in DEMO_PROJECTS:
+            proj_scale = rng.uniform(0.3, 1.0)
+            for model in DEMO_MODELS.get(provider, ["demo-model"]):
+                base = rng.uniform(0.2, 1.5) * (0.4 if weekend else 1.0) * proj_scale
+                spike = rng.uniform(2.5, 4.0) if rng.random() > 0.96 else 1.0
+                in_tok = int(base * spike * rng.uniform(0.3, 0.5) * 1e6)
+                out_tok = int(base * spike * rng.uniform(0.05, 0.12) * 1e6)
+                rows.append({
+                    "day": d, "model": model, "project_id": pid, "project_name": pname,
+                    "input_tokens": in_tok, "output_tokens": out_tok,
+                    "cost_usd": round(estimate_cost(model, in_tok, out_tok), 4),
+                })
         d += timedelta(days=1)
     return rows
 
@@ -97,14 +103,35 @@ def _openai_daily_costs(client: httpx.Client, api_key: str, start_ts: int, end_t
     return out
 
 
+def _openai_project_names(client: httpx.Client, headers: dict) -> dict[str, str]:
+    """프로젝트 ID → 이름 매핑. 키에 management 읽기 권한이 없으면 빈 dict (ID 그대로 표시)."""
+    out: dict[str, str] = {}
+    try:
+        params = {"limit": 100}
+        while True:
+            r = client.get("https://api.openai.com/v1/organization/projects", params=params, headers=headers)
+            if r.status_code != 200:
+                return out
+            data = r.json()
+            for p in data.get("data", []):
+                out[p["id"]] = p.get("name") or p["id"]
+            if data.get("has_more") and data.get("last_id"):
+                params["after"] = data["last_id"]
+            else:
+                break
+    except Exception:
+        pass
+    return out
+
+
 def collect_openai(api_key: str, start: date, end: date) -> list[dict]:
-    """OpenAI Usage API (organization/usage/completions), 일 단위 × 모델별."""
+    """OpenAI Usage API (organization/usage/completions), 일 단위 × 프로젝트 × 모델별."""
     start_ts = int(datetime(start.year, start.month, start.day, tzinfo=timezone.utc).timestamp())
     end_ts = int(datetime(end.year, end.month, end.day, tzinfo=timezone.utc).timestamp()) + 86400
     rows: list[dict] = []
     params = {
         "start_time": start_ts, "end_time": end_ts,
-        "bucket_width": "1d", "group_by": "model", "limit": 31,
+        "bucket_width": "1d", "group_by": ["model", "project_id"], "limit": 31,
     }
     headers = {"Authorization": f"Bearer {api_key}", **UA}
     url = "https://api.openai.com/v1/organization/usage/completions"
@@ -128,6 +155,7 @@ def collect_openai(api_key: str, start: date, end: date) -> list[dict]:
                         continue
                     rows.append({
                         "day": d, "model": model,
+                        "project_id": item.get("project_id"), "project_name": None,
                         "input_tokens": in_tok, "output_tokens": out_tok,
                         "cost_usd": round(estimate_cost(model, in_tok, out_tok), 4),
                     })
@@ -135,6 +163,11 @@ def collect_openai(api_key: str, start: date, end: date) -> list[dict]:
                 params["page"] = data["next_page"]
             else:
                 break
+        # 프로젝트 이름 해석 (권한 없으면 ID 그대로)
+        names = _openai_project_names(client, headers)
+        for row in rows:
+            if row["project_id"]:
+                row["project_name"] = names.get(row["project_id"], row["project_id"])
         # 실제 청구 금액으로 보정
         _rescale_to_actual(rows, _openai_daily_costs(client, api_key, start_ts, end_ts))
     return rows
@@ -167,14 +200,35 @@ def _anthropic_daily_costs(client: httpx.Client, headers: dict, start: date, end
     except Exception:
         return {}
     return out
+def _anthropic_workspace_names(client: httpx.Client, headers: dict) -> dict[str, str]:
+    """워크스페이스 ID → 이름 매핑. 실패하면 빈 dict (ID 그대로 표시)."""
+    out: dict[str, str] = {}
+    try:
+        params = {"limit": 100}
+        while True:
+            r = client.get("https://api.anthropic.com/v1/organizations/workspaces", params=params, headers=headers)
+            if r.status_code != 200:
+                return out
+            data = r.json()
+            for w in data.get("data", []):
+                out[w["id"]] = w.get("name") or w["id"]
+            if data.get("has_more") and data.get("last_id"):
+                params["after_id"] = data["last_id"]
+            else:
+                break
+    except Exception:
+        pass
+    return out
+
+
 def collect_anthropic(api_key: str, start: date, end: date) -> list[dict]:
-    """Anthropic Admin API usage_report/messages, 일 단위 × 모델별."""
+    """Anthropic Admin API usage_report/messages, 일 단위 × 워크스페이스 × 모델별."""
     headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01", **UA}
     params = {
         "starting_at": f"{start.isoformat()}T00:00:00Z",
         "ending_at": f"{(end + timedelta(days=1)).isoformat()}T00:00:00Z",
         "bucket_width": "1d",
-        "group_by[]": "model",
+        "group_by[]": ["model", "workspace_id"],
         "limit": 31,
     }
     url = "https://api.anthropic.com/v1/organizations/usage_report/messages"
@@ -199,6 +253,7 @@ def collect_anthropic(api_key: str, start: date, end: date) -> list[dict]:
                         continue
                     rows.append({
                         "day": d, "model": model,
+                        "project_id": item.get("workspace_id"), "project_name": None,
                         "input_tokens": in_tok, "output_tokens": out_tok,
                         "cost_usd": round(estimate_cost(model, in_tok, out_tok), 4),
                     })
@@ -206,6 +261,11 @@ def collect_anthropic(api_key: str, start: date, end: date) -> list[dict]:
                 params["page"] = data["next_page"]
             else:
                 break
+        # 워크스페이스 이름 해석 (기본 워크스페이스는 ID가 null → "기본"으로 표시)
+        names = _anthropic_workspace_names(client, headers)
+        for row in rows:
+            if row["project_id"]:
+                row["project_name"] = names.get(row["project_id"], row["project_id"])
         # 실제 청구 금액으로 보정
         _rescale_to_actual(rows, _anthropic_daily_costs(client, headers, start, end))
     return rows
