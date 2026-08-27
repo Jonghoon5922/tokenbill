@@ -27,9 +27,13 @@ def init_db():
             pk_cols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(provider_keys)")]
             if pk_cols and "label" not in pk_cols:
                 conn.exec_driver_sql("ALTER TABLE provider_keys RENAME TO provider_keys_old")
+                # SQLite는 rename 후에도 인덱스 이름이 유지되어 create_all과 충돌 → 미리 제거
+                conn.exec_driver_sql("DROP INDEX IF EXISTS ix_provider_keys_user_id")
             ud_cols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(usage_daily)")]
             if ud_cols and "key_id" not in ud_cols:
                 conn.exec_driver_sql("ALTER TABLE usage_daily RENAME TO usage_daily_old")
+                conn.exec_driver_sql("DROP INDEX IF EXISTS ix_usage_daily_user_id")
+                conn.exec_driver_sql("DROP INDEX IF EXISTS ix_usage_daily_day")
 
     Base.metadata.create_all(engine)
 
