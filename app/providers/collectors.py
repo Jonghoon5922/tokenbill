@@ -32,8 +32,8 @@ DEMO_MODELS = {
 }
 
 
-def collect_demo(provider: str, start: date, end: date) -> list[dict]:
-    rng = random.Random(f"{provider}-demo")
+def collect_demo(provider: str, start: date, end: date, seed: str = "demo") -> list[dict]:
+    rng = random.Random(f"{provider}-{seed}")
     rows = []
     d = start
     while d <= end:
@@ -225,7 +225,8 @@ COLLECTORS = {
 
 def collect(provider: str, api_key: str, start: date, end: date) -> list[dict]:
     if api_key.lower().startswith("demo"):
-        return collect_demo(provider, start, end)
+        # 키 문자열을 시드로 써서 조직(키)마다 다른 데모 데이터를 생성
+        return collect_demo(provider, start, end, seed=api_key)
     fn = COLLECTORS.get(provider)
     if fn is None:
         raise CollectError(f"지원하지 않는 프로바이더: {provider}")

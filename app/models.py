@@ -29,23 +29,25 @@ class ProviderKey(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     provider: Mapped[str] = mapped_column(String(32))          # openai | anthropic | google
+    label: Mapped[str] = mapped_column(String(64), default="기본")  # 조직 구분용 이름
     key_encrypted: Mapped[str] = mapped_column(String(2048))   # Fernet 암호화
     key_masked: Mapped[str] = mapped_column(String(64))        # 표시용 (sk-…abcd)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_status: Mapped[str] = mapped_column(String(255), default="pending")  # ok | error: … | pending
 
     user: Mapped["User"] = relationship(back_populates="keys")
-    __table_args__ = (UniqueConstraint("user_id", "provider", name="uq_user_provider"),)
+    __table_args__ = (UniqueConstraint("user_id", "provider", "label", name="uq_user_provider_label"),)
 
 
 class UsageDaily(Base):
     __tablename__ = "usage_daily"
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    key_id: Mapped[int | None] = mapped_column(ForeignKey("provider_keys.id"), index=True, nullable=True)
     day: Mapped[date] = mapped_column(Date, index=True)
     provider: Mapped[str] = mapped_column(String(32))
     model: Mapped[str] = mapped_column(String(128))
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     input_tokens: Mapped[int] = mapped_column(Integer, default=0)
     output_tokens: Mapped[int] = mapped_column(Integer, default=0)
-    __table_args__ = (UniqueConstraint("user_id", "day", "provider", "model", name="uq_usage_row"),)
+    __table_args__ = (UniqueConstraint("user_id", "key_id", "day", "provider", "model", name="uq_usage_row"),)

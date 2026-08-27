@@ -22,35 +22,37 @@ def cooldown_remaining_sec(user: models.User) -> int:
     return max(0, int(MANUAL_COOLDOWN_MIN * 60 - elapsed))
 
 
-def sync_user(db: Session, user: models.User) -> dict:
-    """해당 사용자의 모든 키에 대해 최근 LOOKBACK_DAYS일을 재수집한다."""
+def sync_user(db: Session, user: models.User) -> list[dict]:
+    """해당 사용자의 모든 키(조직)에 대해 최근 LOOKBACK_DAYS일을 재수집한다."""
     end = date.today()
     start = end - timedelta(days=LOOKBACK_DAYS)
-    results = {}
+    results = []
     for key in user.keys:
+        entry = {"key_id": key.id, "provider": key.provider, "label": key.label}
         try:
             rows = collect(key.provider, decrypt_key(key.key_encrypted), start, end)
-            # 기간 내 기존 행을 지우고 다시 넣는다 (당일 데이터가 계속 갱신되므로)
+            # 기간 내 이 키의 기존 행을 지우고 다시 넣는다 (당일 데이터가 계속 갱신되므로)
             db.execute(
                 delete(models.UsageDaily).where(
                     models.UsageDaily.user_id == user.id,
-                    models.UsageDaily.provider == key.provider,
+                    models.UsageDaily.key_id == key.id,
                     models.UsageDaily.day >= start,
                 )
             )
             for r in rows:
                 db.add(models.UsageDaily(
-                    user_id=user.id, day=r["day"], provider=key.provider, model=r["model"],
+                    user_id=user.id, key_id=key.id, day=r["day"], provider=key.provider, model=r["model"],
                     cost_usd=r["cost_usd"], input_tokens=r["input_tokens"], output_tokens=r["output_tokens"],
                 ))
             key.last_status = "ok"
-            results[key.provider] = {"ok": True, "rows": len(rows)}
+            entry.update(ok=True, rows=len(rows))
         except CollectError as e:
             key.last_status = f"error: {e}"
-            results[key.provider] = {"ok": False, "error": str(e)}
+            entry.update(ok=False, error=str(e))
         except Exception as e:  # 네트워크 등 예기치 못한 오류
             key.last_status = "error: 수집 중 오류가 발생했습니다"
-            results[key.provider] = {"ok": False, "error": f"수집 실패: {type(e).__name__}"}
+            entry.update(ok=False, error=f"수집 실패: {type(e).__name__}")
+        results.append(entry)
     user.last_sync_at = datetime.utcnow()
     db.commit()
     return results

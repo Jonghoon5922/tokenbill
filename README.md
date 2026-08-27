@@ -19,6 +19,8 @@ http://localhost:8000 접속 → 회원가입 → 프로바이더 키 등록.
   Anthropic도 **Admin 키**(`sk-ant-admin-…`, console.anthropic.com → Settings → Admin Keys)가 필요합니다.
   일반 API 키로는 사용량 조회가 안 됩니다.
 - Google AI는 Cloud Billing 연동이 필요해서 MVP에서는 미지원(데모만 가능).
+- **다중 조직**: 프로바이더당 키를 여러 개(조직별 이름 붙여서) 등록할 수 있고,
+  대시보드에서 조직별 이번 달 비용이 나뉘어 보입니다. 차트·합계는 전체 조직 합산 기준.
 
 API 문서: http://localhost:8000/docs (FastAPI 자동 생성)
 

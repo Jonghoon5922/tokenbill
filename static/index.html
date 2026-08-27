@@ -80,8 +80,12 @@
   .btn.ghost { background: transparent; color: var(--ink-2); border: 1px solid var(--border); }
   .btn.ghost:hover { background: var(--chip); filter: none; }
   button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .keyform { display: flex; gap: 8px; margin-top: 10px; }
+  .keyform { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
   .keyform input { flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--page); color: var(--ink); font: inherit; font-size: 0.82rem; font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+  .keyform input.orglabel { flex: 0 1 110px; min-width: 90px; font-family: inherit; }
+  .prov.org { padding-left: 26px; }
+  .prov.org .nm { font-weight: 500; }
+  .prov .addorg { font-size: 0.74rem; padding: 4px 10px; }
   .legend { display: flex; gap: 14px; font-size: 0.76rem; color: var(--ink-2); margin-bottom: 8px; flex-wrap: wrap; }
   .legend .key { display: inline-flex; align-items: center; gap: 6px; }
   .legend .sw { width: 10px; height: 10px; border-radius: 3px; }
@@ -320,13 +324,18 @@
   $("mvCost").addEventListener("click", function () { modelView = "cost"; render(); });
   $("mvTok").addEventListener("click", function () { modelView = "tok"; render(); });
 
+  function syncErrors(sync) {
+    return (sync || []).filter(function (s) { return !s.ok; }).map(function (s) {
+      return PROVIDERS[s.provider].name + " (" + s.label + "): " + s.error;
+    });
+  }
+
   $("syncBtn").addEventListener("click", function () {
     var btn = this; btn.disabled = true; btn.textContent = "갱신 중…";
     api("/api/sync", { method: "POST" })
       .then(function (r) {
-        var errs = Object.keys(r.sync).filter(function (p) { return !r.sync[p].ok; });
-        if (errs.length) toast(errs.map(function (p) { return PROVIDERS[p].name + ": " + r.sync[p].error; }).join(" / "));
-        else toast("갱신 완료");
+        var errs = syncErrors(r.sync);
+        toast(errs.length ? errs.join(" / ") : "갱신 완료");
         return refreshAll();
       })
       .catch(function (e) { toast(e.message); return refreshAll(); });
@@ -341,18 +350,20 @@
       var input = $("key-" + pid);
       var val = input ? input.value.trim() : "";
       if (!val) { toast("API 키를 입력해 주세요"); return; }
+      var labelInput = $("label-" + pid);
+      var label = labelInput ? labelInput.value.trim() : "";
       var btn = $("cbtn-" + pid); if (btn) { btn.disabled = true; btn.textContent = "연결 중…"; }
-      api("/api/providers", { method: "POST", body: JSON.stringify({ provider: pid, api_key: val }) })
+      api("/api/providers", { method: "POST", body: JSON.stringify({ provider: pid, api_key: val, label: label || "기본" }) })
         .then(function (r) {
-          var s = r.sync[pid];
+          var s = (r.sync || []).filter(function (x) { return x.key_id === r.key_id; })[0];
           if (s && !s.ok) toast(PROVIDERS[pid].name + ": " + s.error);
           else toast(PROVIDERS[pid].name + " 연결 완료");
           return refreshAll();
         })
         .catch(function (e) { toast(e.message); return refreshAll(); });
     },
-    disconnect: function (pid) {
-      api("/api/providers/" + pid, { method: "DELETE" })
+    disconnect: function (keyId) {
+      api("/api/providers/" + keyId, { method: "DELETE" })
         .then(refreshAll).catch(function (e) { toast(e.message); });
     }
   };
@@ -466,23 +477,32 @@
   function renderProviders() {
     var el = $("provList");
     var connectedCnt = providers.filter(function (p) { return p.connected; }).length;
-    $("provCnt").textContent = connectedCnt + " / " + providers.length;
+    var orgCnt = providers.reduce(function (n, p) { return n + (p.keys || []).length; }, 0);
+    $("provCnt").textContent = connectedCnt + " / " + providers.length + (orgCnt > connectedCnt ? " · 조직 " + orgCnt : "");
     el.innerHTML = providers.map(function (p) {
       var meta = PROVIDERS[p.provider];
+      var keyform = '<div class="keyform hidden" id="form-' + p.provider + '">' +
+        '<input type="text" class="orglabel" id="label-' + p.provider + '" placeholder="조직 이름" aria-label="' + meta.name + ' 조직 이름">' +
+        '<input type="password" id="key-' + p.provider + '" placeholder="' + meta.keyPrefix + '… 또는 demo" aria-label="' + meta.name + ' API 키">' +
+        '<button class="btn" id="cbtn-' + p.provider + '" onclick="tokenbill.connect(\'' + p.provider + '\')">연결</button></div>';
       if (p.connected) {
-        var err = p.status && p.status.indexOf("error:") === 0 ? p.status.slice(6).trim() : null;
-        return '<div class="prov"><span class="dot" style="background:' + meta.color + '"></span>' +
-          '<div class="nm">' + meta.name + '<span class="key">' + esc(p.key_masked || "") + '</span>' +
-          (err ? '<span class="err">' + esc(err) + '</span>' : '') + '</div>' +
+        var head = '<div class="prov"><span class="dot" style="background:' + meta.color + '"></span>' +
+          '<div class="nm">' + meta.name + '</div>' +
           '<div class="amt">' + fmt(p.month_cost_usd) + '<span class="cap">이번 달</span></div>' +
-          '<button class="btn ghost" onclick="tokenbill.disconnect(\'' + p.provider + '\')">해제</button></div>';
+          '<button class="btn ghost addorg" onclick="tokenbill.showKeyForm(\'' + p.provider + '\')">+ 조직</button></div>';
+        var orgs = p.keys.map(function (k) {
+          var err = k.status && k.status.indexOf("error:") === 0 ? k.status.slice(6).trim() : null;
+          return '<div class="prov org">' +
+            '<div class="nm">' + esc(k.label) + '<span class="key">' + esc(k.key_masked || "") + '</span>' +
+            (err ? '<span class="err">' + esc(err) + '</span>' : '') + '</div>' +
+            '<div class="amt">' + fmt(k.month_cost_usd) + '</div>' +
+            '<button class="btn ghost" onclick="tokenbill.disconnect(' + k.id + ')">해제</button></div>';
+        }).join("");
+        return head + orgs + keyform;
       }
       return '<div class="prov"><span class="dot" style="background:' + meta.color + ';opacity:0.35"></span>' +
         '<div class="nm" style="color:var(--muted)">' + meta.name + '</div>' +
-        '<button class="btn" onclick="tokenbill.showKeyForm(\'' + p.provider + '\')">키 등록</button></div>' +
-        '<div class="keyform hidden" id="form-' + p.provider + '">' +
-        '<input type="password" id="key-' + p.provider + '" placeholder="' + meta.keyPrefix + '… 또는 demo" aria-label="' + meta.name + ' API 키">' +
-        '<button class="btn" id="cbtn-' + p.provider + '" onclick="tokenbill.connect(\'' + p.provider + '\')">연결</button></div>';
+        '<button class="btn" onclick="tokenbill.showKeyForm(\'' + p.provider + '\')">키 등록</button></div>' + keyform;
     }).join("");
   }
 
