@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from . import models
 from .collector import cooldown_remaining_sec, sync_all_users, sync_user, MANUAL_COOLDOWN_MIN
+from .providers.collectors import fetch_org_name
 from .db import get_db, init_db
 from .security import (create_token, current_user, encrypt_key, hash_password,
                        mask_key, verify_password)
@@ -37,7 +38,7 @@ class SettingsIn(BaseModel):
 class KeyIn(BaseModel):
     provider: str = Field(pattern="^(openai|anthropic|google)$")
     api_key: str = Field(min_length=4, max_length=512)
-    label: str = Field(default="기본", min_length=1, max_length=64)  # 조직 구분용 이름
+    label: str = Field(default="", max_length=64)  # 비우면 조직 이름 자동 결정
 
 
 # ── 인증 ────────────────────────────────────────────────────
@@ -115,9 +116,18 @@ def list_providers(user: models.User = Depends(current_user), db: Session = Depe
 
 @app.post("/api/providers")
 def add_provider(body: KeyIn, user: models.User = Depends(current_user), db: Session = Depends(get_db)):
-    label = body.label.strip() or "기본"
-    if any(k.provider == body.provider and k.label == label for k in user.keys):
+    label = body.label.strip()
+    existing_labels = {k.label for k in user.keys if k.provider == body.provider}
+    if label and label in existing_labels:
         raise HTTPException(409, f"'{label}' 이름의 조직이 이미 연결되어 있습니다 — 다른 이름을 사용해 주세요")
+    if not label:
+        # API에서 조직 이름을 가져오고, 안 되면 "조직 N"으로 자동 부여. 중복이면 번호를 붙인다.
+        base = fetch_org_name(body.provider, body.api_key) or \
+               ("데모 조직" if body.api_key.lower().startswith("demo") else "조직")
+        label, n = (base if base != "조직" else "조직 1"), 2
+        while label in existing_labels:
+            label = f"{base} {n}"
+            n += 1
     key = models.ProviderKey(
         user_id=user.id, provider=body.provider, label=label,
         key_encrypted=encrypt_key(body.api_key), key_masked=mask_key(body.api_key),

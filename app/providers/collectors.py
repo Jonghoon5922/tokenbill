@@ -283,6 +283,25 @@ COLLECTORS = {
 }
 
 
+def fetch_org_name(provider: str, api_key: str) -> str | None:
+    """키가 속한 조직 이름 조회 (등록 시 라벨 자동 결정용). 실패하면 None."""
+    if api_key.lower().startswith("demo"):
+        return None
+    try:
+        with httpx.Client(timeout=10) as client:
+            if provider == "anthropic":
+                r = client.get(
+                    "https://api.anthropic.com/v1/organizations/me",
+                    headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", **UA},
+                )
+                if r.status_code == 200:
+                    return r.json().get("name") or None
+            # OpenAI admin API는 조직 이름 조회 엔드포인트가 없다
+    except Exception:
+        pass
+    return None
+
+
 def collect(provider: str, api_key: str, start: date, end: date) -> list[dict]:
     if api_key.lower().startswith("demo"):
         # 키 문자열을 시드로 써서 조직(키)마다 다른 데모 데이터를 생성

@@ -88,6 +88,7 @@
   .prov.org .nm .arrow { display: inline-block; width: 14px; color: var(--muted); font-size: 0.7rem; }
   .prov .addorg { font-size: 0.74rem; padding: 4px 10px; }
   .projbox { padding: 2px 0 8px 44px; border-bottom: 1px solid var(--grid); }
+  .projbox.flat { padding-left: 26px; }
   .projbox:last-child { border-bottom: none; }
   .projrow { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0 2px; font-size: 0.85rem; font-weight: 600; }
   .projrow .v { font-variant-numeric: tabular-nums; }
@@ -360,10 +361,8 @@
       var input = $("key-" + pid);
       var val = input ? input.value.trim() : "";
       if (!val) { toast("API 키를 입력해 주세요"); return; }
-      var labelInput = $("label-" + pid);
-      var label = labelInput ? labelInput.value.trim() : "";
       var btn = $("cbtn-" + pid); if (btn) { btn.disabled = true; btn.textContent = "연결 중…"; }
-      api("/api/providers", { method: "POST", body: JSON.stringify({ provider: pid, api_key: val, label: label || "기본" }) })
+      api("/api/providers", { method: "POST", body: JSON.stringify({ provider: pid, api_key: val }) })
         .then(function (r) {
           var s = (r.sync || []).filter(function (x) { return x.key_id === r.key_id; })[0];
           if (s && !s.ok) toast(PROVIDERS[pid].name + ": " + s.error);
@@ -376,11 +375,15 @@
       api("/api/providers/" + keyId, { method: "DELETE" })
         .then(refreshAll).catch(function (e) { toast(e.message); });
     },
-    toggleOrg: function (keyId) {
-      expandedOrgs[keyId] = !expandedOrgs[keyId];
+    toggleOrg: function (keyId, defOpen) {
+      expandedOrgs[keyId] = !isOrgOpen(keyId, defOpen);
       render();
     }
   };
+
+  function isOrgOpen(keyId, defOpen) {
+    return (keyId in expandedOrgs) ? expandedOrgs[keyId] : !!defOpen;
+  }
 
   // 키(조직)별 이번 달 breakdown → [{name, cost, models:[{model, cost, inTok, outTok}]}]
   function projectsOfKey(keyId) {
@@ -514,9 +517,38 @@
     el.innerHTML = providers.map(function (p) {
       var meta = PROVIDERS[p.provider];
       var keyform = '<div class="keyform hidden" id="form-' + p.provider + '">' +
-        '<input type="text" class="orglabel" id="label-' + p.provider + '" placeholder="조직 이름" aria-label="' + meta.name + ' 조직 이름">' +
         '<input type="password" id="key-' + p.provider + '" placeholder="' + meta.keyPrefix + '… 또는 demo" aria-label="' + meta.name + ' API 키">' +
         '<button class="btn" id="cbtn-' + p.provider + '" onclick="tokenbill.connect(\'' + p.provider + '\')">연결</button></div>';
+      function renderProjects(keyId, flat) {
+        var cls = 'projbox' + (flat ? ' flat' : '');
+        var projs = projectsOfKey(keyId);
+        if (!projs.length) {
+          return '<div class="' + cls + '"><p class="empty" style="padding:8px 0">이번 달 사용 내역이 없습니다.</p></div>';
+        }
+        return projs.map(function (pr) {
+          return '<div class="' + cls + '">' +
+            '<div class="projrow"><span>' + esc(pr.name) + '</span><span class="v">' + fmt(pr.cost) + '</span></div>' +
+            pr.models.map(function (m) {
+              return '<div class="mline"><span class="mnm">' + esc(m.model) + '</span>' +
+                '<span class="mv">' + fmt(m.cost) + ' · ' + fmtTok(m.inTok + m.outTok) + ' tok</span></div>';
+            }).join("") +
+            '</div>';
+        }).join("");
+      }
+      if (p.connected && p.keys.length === 1) {
+        // 키가 하나면 조직 계층 생략 — 프로바이더 바로 아래 프로젝트 표시 (기본 펼침)
+        var k1 = p.keys[0];
+        var err1 = k1.status && k1.status.indexOf("error:") === 0 ? k1.status.slice(6).trim() : null;
+        var open1 = isOrgOpen(k1.id, true);
+        return '<div class="prov"><span class="dot" style="background:' + meta.color + '"></span>' +
+          '<div class="nm" title="' + esc(k1.key_masked || "") + '" style="cursor:pointer" onclick="tokenbill.toggleOrg(' + k1.id + ', true)">' +
+          '<span class="arrow" style="display:inline-block;width:14px;color:var(--muted);font-size:0.7rem">' + (open1 ? '▾' : '▸') + '</span>' + meta.name +
+          (err1 ? '<span class="err">' + esc(err1) + '</span>' : '') + '</div>' +
+          '<div class="amt">' + fmt(p.month_cost_usd) + '<span class="cap">이번 달</span></div>' +
+          '<button class="btn ghost addorg" onclick="tokenbill.showKeyForm(\'' + p.provider + '\')" aria-label="' + meta.name + ' 조직 추가" title="조직 추가">+</button>' +
+          '<button class="btn ghost" onclick="tokenbill.disconnect(' + k1.id + ')">해제</button></div>' +
+          (open1 ? renderProjects(k1.id, true) : '') + keyform;
+      }
       if (p.connected) {
         var head = '<div class="prov"><span class="dot" style="background:' + meta.color + '"></span>' +
           '<div class="nm">' + meta.name + '</div>' +
@@ -524,29 +556,14 @@
           '<button class="btn ghost addorg" onclick="tokenbill.showKeyForm(\'' + p.provider + '\')" aria-label="' + meta.name + ' 조직 추가" title="조직 추가">+</button></div>';
         var orgs = p.keys.map(function (k) {
           var err = k.status && k.status.indexOf("error:") === 0 ? k.status.slice(6).trim() : null;
-          var open = !!expandedOrgs[k.id];
+          var open = isOrgOpen(k.id, false);
           var html = '<div class="prov org">' +
-            '<div class="nm" title="' + esc(k.key_masked || "") + '" onclick="tokenbill.toggleOrg(' + k.id + ')">' +
+            '<div class="nm" title="' + esc(k.key_masked || "") + '" onclick="tokenbill.toggleOrg(' + k.id + ', false)">' +
             '<span class="arrow">' + (open ? '▾' : '▸') + '</span>' + esc(k.label) +
             (err ? '<span class="err">' + esc(err) + '</span>' : '') + '</div>' +
             '<div class="amt">' + fmt(k.month_cost_usd) + '</div>' +
             '<button class="btn ghost" onclick="tokenbill.disconnect(' + k.id + ')">해제</button></div>';
-          if (open) {
-            var projs = projectsOfKey(k.id);
-            if (!projs.length) {
-              html += '<div class="projbox"><p class="empty" style="padding:8px 0">이번 달 사용 내역이 없습니다.</p></div>';
-            } else {
-              html += projs.map(function (pr) {
-                return '<div class="projbox">' +
-                  '<div class="projrow"><span>' + esc(pr.name) + '</span><span class="v">' + fmt(pr.cost) + '</span></div>' +
-                  pr.models.map(function (m) {
-                    return '<div class="mline"><span class="mnm">' + esc(m.model) + '</span>' +
-                      '<span class="mv">' + fmt(m.cost) + ' · ' + fmtTok(m.inTok + m.outTok) + ' tok</span></div>';
-                  }).join("") +
-                  '</div>';
-              }).join("");
-            }
-          }
+          if (open) html += renderProjects(k.id, false);
           return html;
         }).join("");
         return head + orgs + keyform;
