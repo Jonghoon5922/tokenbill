@@ -51,76 +51,49 @@ static/index.html         # 프론트엔드 (로그인 + 대시보드)
   (자동 수집으로 대체 예정 — LiteLLM의 model_prices JSON 참고).
 - **키 보안**: API 키는 SECRET_KEY에서 유도한 Fernet 키로 암호화 저장, 화면에는 마스킹만 노출.
 
-## 배포 — 리눅스 서버 + Podman
+## 배포 — 실제 운영 구성 (EC2 + Docker + GitHub Actions)
 
-### 1) 이미지 빌드
+현재 운영: AWS EC2(Ubuntu 24.04, `ubuntu@52.79.213.236`)에서 **docker**로 실행.
+`main`에 푸시하면 GitHub Actions([build.yml](.github/workflows/build.yml))가
+이미지를 빌드해 `ghcr.io/jonghoon5922/tokenbill:latest`로 올린다 — 서버에서 빌드하지 않는다.
 
-```bash
-podman build -f Containerfile -t tokenbill:0.1 .
-```
+- SECRET_KEY: 서버의 `~/.tokenbill-secret` 파일에 보관 (한 줄)
+- DB: `tokenbill-data` 도커 볼륨 → 컨테이너 `/data/tokenbill.db` (재배포해도 유지)
 
-### 2) 실행
-
-```bash
-# DB 보관용 볼륨 (SQLite 파일이 컨테이너 밖에 남아 재배포해도 유지됨)
-podman volume create tokenbill-data
-
-podman run -d --name tokenbill \
-  -p 8000:8000 \
-  -v tokenbill-data:/data \
-  -e SECRET_KEY="$(openssl rand -hex 32)" \
-  --restart unless-stopped \
-  tokenbill:0.1
-```
-
-주의: `SECRET_KEY`는 한 번 정하면 **바꾸지 말 것** — 이 키로 API 키를 암호화하므로,
-바뀌면 저장된 프로바이더 키를 복호화할 수 없다. 위처럼 매번 생성하지 말고
-`openssl rand -hex 32` 결과를 어딘가(예: `/etc/tokenbill/secret`)에 보관하고 재사용할 것:
+### 새 버전 배포 절차
 
 ```bash
-sudo mkdir -p /etc/tokenbill && openssl rand -hex 32 | sudo tee /etc/tokenbill/secret
-podman run -d --name tokenbill -p 8000:8000 -v tokenbill-data:/data \
-  -e SECRET_KEY="$(sudo cat /etc/tokenbill/secret)" --restart unless-stopped tokenbill:0.1
+# 0) (스키마 변경이 있는 배포면) DB 백업
+docker cp tokenbill:/data /home/ubuntu/tokenbill-data-backup-$(date +%Y%m%d)
+
+# 1) GitHub Actions 빌드 완료 확인 후 pull
+docker pull ghcr.io/jonghoon5922/tokenbill:latest
+
+# 2) 컨테이너 교체 (볼륨·시크릿 유지)
+docker stop tokenbill && docker rm tokenbill
+docker run -d --name tokenbill -p 8000:8000 -v tokenbill-data:/data \
+  -e SECRET_KEY="$(cat ~/.tokenbill-secret)" --restart unless-stopped \
+  ghcr.io/jonghoon5922/tokenbill:latest
+
+# 3) 확인
+docker logs --tail 30 tokenbill
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/
 ```
 
-### 3) 부팅 시 자동 시작 (systemd Quadlet, podman ≥ 4.4)
+롤백: `ghcr.io/jonghoon5922/tokenbill:<커밋 SHA>` 태그로 같은 절차 반복 + 백업 복원.
 
-`~/.config/containers/systemd/tokenbill.container` (rootless 기준):
+주의: `SECRET_KEY`는 한 번 정하면 **바꾸지 말 것** — 이 키로 프로바이더 API 키를
+암호화하므로, 바뀌면 저장된 키를 복호화할 수 없다.
 
-```ini
-[Unit]
-Description=tokenbill
-
-[Container]
-Image=localhost/tokenbill:0.1
-PublishPort=8000:8000
-Volume=tokenbill-data:/data
-EnvironmentFile=/etc/tokenbill/env        # SECRET_KEY=... 한 줄
-
-[Service]
-Restart=always
-
-[Install]
-WantedBy=default.target
-```
+### 첫 서버 세팅 (참고)
 
 ```bash
-systemctl --user daemon-reload
-systemctl --user start tokenbill
-loginctl enable-linger $USER   # 로그아웃 후에도 유지
+openssl rand -hex 32 > ~/.tokenbill-secret && chmod 600 ~/.tokenbill-secret
+docker volume create tokenbill-data
+# 이후 위 "컨테이너 교체" 절차의 run 명령과 동일
 ```
 
-구버전 podman이면 `podman generate systemd --new --name tokenbill`로 유닛 파일 생성.
-
-### 4) 새 버전 배포
-
-```bash
-podman build -f Containerfile -t tokenbill:0.2 .
-podman stop tokenbill && podman rm tokenbill
-# 같은 볼륨으로 다시 run (데이터 유지)
-```
-
-### 5) HTTPS
+### HTTPS
 
 외부 공개 시 앞단에 Caddy나 nginx를 두는 것을 권장.
 Caddy면 `Caddyfile`에 `내도메인.com { reverse_proxy localhost:8000 }` 두 줄로 끝.
