@@ -192,7 +192,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/", include_in_schema=False)
 def index():
-    return FileResponse("static/index.html")
+    # 프론트가 단일 HTML이라 구버전 캐시가 남으면 새 API와 어긋난다 → 항상 재검증
+    return FileResponse("static/index.html", headers={"Cache-Control": "no-cache"})
 
 
 # ── 스케줄러: 매일 1회 자동 수집 (03:00 KST = 18:00 UTC) ────
