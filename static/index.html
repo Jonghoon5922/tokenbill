@@ -489,11 +489,11 @@
         var head = '<div class="prov"><span class="dot" style="background:' + meta.color + '"></span>' +
           '<div class="nm">' + meta.name + '</div>' +
           '<div class="amt">' + fmt(p.month_cost_usd) + '<span class="cap">이번 달</span></div>' +
-          '<button class="btn ghost addorg" onclick="tokenbill.showKeyForm(\'' + p.provider + '\')">+ 조직</button></div>';
+          '<button class="btn ghost addorg" onclick="tokenbill.showKeyForm(\'' + p.provider + '\')" aria-label="' + meta.name + ' 조직 추가" title="조직 추가">+</button></div>';
         var orgs = p.keys.map(function (k) {
           var err = k.status && k.status.indexOf("error:") === 0 ? k.status.slice(6).trim() : null;
           return '<div class="prov org">' +
-            '<div class="nm">' + esc(k.label) + '<span class="key">' + esc(k.key_masked || "") + '</span>' +
+            '<div class="nm" title="' + esc(k.key_masked || "") + '">' + esc(k.label) +
             (err ? '<span class="err">' + esc(err) + '</span>' : '') + '</div>' +
             '<div class="amt">' + fmt(k.month_cost_usd) + '</div>' +
             '<button class="btn ghost" onclick="tokenbill.disconnect(' + k.id + ')">해제</button></div>';
