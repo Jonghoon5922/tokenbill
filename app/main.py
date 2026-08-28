@@ -1,5 +1,9 @@
 """Tokenbill — AI API 비용 대시보드 백엔드."""
+import os
+import secrets
 from datetime import date, timedelta
+
+import httpx
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import Depends, FastAPI, HTTPException
@@ -21,6 +25,7 @@ init_db()
 app = FastAPI(title="Tokenbill API", version="0.1.0")
 
 PROVIDERS = ["openai", "anthropic", "google"]
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")  # 설정하면 구글 로그인 활성화
 
 
 # ── 스키마 ──────────────────────────────────────────────────
@@ -41,7 +46,45 @@ class KeyIn(BaseModel):
     label: str = Field(default="", max_length=64)  # 비우면 조직 이름 자동 결정
 
 
+class GoogleAuthIn(BaseModel):
+    credential: str = Field(min_length=20, max_length=4096)  # Google ID 토큰(JWT)
+
+
 # ── 인증 ────────────────────────────────────────────────────
+@app.get("/api/auth/config")
+def auth_config():
+    """로그인 화면 설정 — 구글 클라이언트 ID가 있으면 프론트가 구글 버튼을 띄운다."""
+    return {"google_client_id": GOOGLE_CLIENT_ID or None}
+
+
+@app.post("/api/auth/google")
+def google_login(body: GoogleAuthIn, db: Session = Depends(get_db)):
+    """Google Identity Services ID 토큰 검증 → 이메일 기준 자동 가입/로그인."""
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(400, "구글 로그인이 설정되지 않았습니다")
+    try:
+        r = httpx.get("https://oauth2.googleapis.com/tokeninfo",
+                      params={"id_token": body.credential}, timeout=10)
+    except Exception:
+        raise HTTPException(502, "구글 인증 서버에 연결할 수 없습니다")
+    if r.status_code != 200:
+        raise HTTPException(401, "구글 인증에 실패했습니다")
+    info = r.json()
+    # aud가 우리 클라이언트 ID인지 확인 — 다른 앱용 토큰 재사용 방지
+    if info.get("aud") != GOOGLE_CLIENT_ID or info.get("email_verified") not in ("true", True):
+        raise HTTPException(401, "구글 인증에 실패했습니다")
+    email = (info.get("email") or "").lower()
+    if not email:
+        raise HTTPException(401, "구글 계정에서 이메일을 확인할 수 없습니다")
+    user = db.query(models.User).filter_by(email=email).first()
+    if user is None:
+        # 구글 가입 계정 — 비밀번호 로그인은 불가능한 무작위 해시로 채운다
+        user = models.User(email=email, password_hash=hash_password(secrets.token_hex(32)))
+        db.add(user)
+        db.commit()
+    return {"token": create_token(user.id)}
+
+
 @app.post("/api/auth/register")
 def register(body: AuthIn, db: Session = Depends(get_db)):
     if db.query(models.User).filter_by(email=body.email.lower()).first():

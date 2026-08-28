@@ -23,6 +23,10 @@ http://localhost:8000 접속 → 회원가입 → 프로바이더 키 등록.
   대시보드에서 조직별 이번 달 비용이 나뉘어 보입니다. 차트·합계는 전체 조직 합산 기준.
 - **프로젝트 드릴다운**: 조직 행을 클릭하면 프로젝트(OpenAI Project / Anthropic
   Workspace) 단위로 펼쳐지고, 프로젝트마다 모델별 비용·토큰이 표시됩니다.
+- **구글 로그인** (선택): `GOOGLE_CLIENT_ID` 환경변수를 설정하면 로그인 화면에
+  "Google로 계속하기" 버튼이 나타납니다. Google Cloud Console에서 OAuth 클라이언트
+  ID(웹)를 만들고, 승인된 JavaScript 출처에 서비스 도메인(https)을 등록해야 합니다.
+  도메인 없이 공인 IP로는 Google 정책상 동작하지 않습니다.
 
 API 문서: http://localhost:8000/docs (FastAPI 자동 생성)
 
