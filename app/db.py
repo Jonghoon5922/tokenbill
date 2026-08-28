@@ -27,6 +27,13 @@ def init_db():
             u_cols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(users)")]
             if u_cols and "is_admin" not in u_cols:
                 conn.exec_driver_sql("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
+            if u_cols and "nickname" not in u_cols:
+                conn.exec_driver_sql("ALTER TABLE users ADD COLUMN nickname VARCHAR(32)")
+            if u_cols:
+                # 별명은 필수 — 기존 사용자는 이메일 앞부분으로 자동 채움
+                conn.exec_driver_sql(
+                    "UPDATE users SET nickname = substr(email, 1, instr(email, '@') - 1) "
+                    "WHERE nickname IS NULL OR nickname = ''")
             if u_cols and "alert_month" not in u_cols:
                 conn.exec_driver_sql("ALTER TABLE users ADD COLUMN alert_month VARCHAR(7)")
                 conn.exec_driver_sql("ALTER TABLE users ADD COLUMN alert_level INTEGER NOT NULL DEFAULT 0")

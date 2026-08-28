@@ -140,6 +140,9 @@
   .atable tr:last-child td { border-bottom: none; }
   .atable .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 0.68rem; font-weight: 600; }
   .atable .del { padding: 4px 10px; font-size: 0.74rem; }
+  .myrow { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--grid); }
+  .myrow:last-of-type { border-bottom: none; }
+  .mylbl { width: 60px; flex: none; font-size: 0.78rem; color: var(--muted); font-weight: 600; }
   .mytier { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--chip); border-radius: 10px; margin-bottom: 12px; }
   .mytier .emj { font-size: 1.9rem; line-height: 1; }
   .mytier .tn { font-weight: 700; font-size: 0.95rem; }
@@ -173,6 +176,7 @@
     <form id="authForm">
       <input type="email" id="authEmail" placeholder="이메일" required autocomplete="email">
       <input type="password" id="authPw" placeholder="비밀번호 (8자 이상)" required minlength="8" autocomplete="current-password">
+      <input type="text" id="authNick" class="hidden" placeholder="별명 (리더보드에 표시됩니다)" maxlength="32" autocomplete="nickname">
       <p class="auth-err" id="authErr"></p>
       <button type="submit" class="btn" id="authBtn">로그인</button>
     </form>
@@ -199,6 +203,7 @@
       <input type="number" id="fxRate" min="1" step="10" aria-label="USD 대 KRW 환율">
       <label for="budget">월 예산 $</label>
       <input type="number" id="budget" min="0" step="10">
+      <button class="btn ghost" onclick="tokenbill.openMy()">마이페이지</button>
       <button class="btn ghost" onclick="tokenbill.openGuide()">가이드</button>
       <button class="btn ghost hidden" id="adminBtn">관리자</button>
       <button class="btn ghost" id="logoutBtn">로그아웃</button>
@@ -295,6 +300,21 @@
 </div>
 </div>
 
+<!-- 마이페이지 -->
+<div id="myModal" class="modal hidden" onclick="if(event.target===this)tokenbill.closeMy()">
+  <div class="modal-card" style="max-width:420px">
+    <h2 style="display:flex;justify-content:space-between;align-items:center">마이페이지
+      <button class="btn ghost" onclick="tokenbill.closeMy()">닫기</button></h2>
+    <div class="myrow"><span class="mylbl">이메일</span><span id="myEmail" style="font-size:0.85rem"></span></div>
+    <div class="myrow"><span class="mylbl">별명</span>
+      <span style="display:flex;gap:8px;flex:1">
+        <input type="text" id="myNick" maxlength="32" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;background:var(--page);color:var(--ink);font:inherit;font-size:0.85rem">
+        <button class="btn" onclick="tokenbill.saveNick()">저장</button>
+      </span></div>
+    <p class="chart-note" style="margin-top:6px">별명은 토큰 리더보드에 표시됩니다.</p>
+  </div>
+</div>
+
 <!-- 사용 가이드 -->
 <div id="guideModal" class="modal hidden" onclick="if(event.target===this)tokenbill.closeGuide()">
   <div class="modal-card">
@@ -376,6 +396,8 @@
     $("tabLogin").className = m === "login" ? "on" : "";
     $("tabSignup").className = m === "signup" ? "on" : "";
     $("authBtn").textContent = m === "login" ? "로그인" : "가입하기";
+    $("authNick").classList.toggle("hidden", m !== "signup");
+    $("authNick").required = m === "signup";
     $("authErr").textContent = "";
   }
   $("tabLogin").addEventListener("click", function () { setAuthMode("login"); });
@@ -383,9 +405,11 @@
   $("authForm").addEventListener("submit", function (e) {
     e.preventDefault();
     $("authErr").textContent = "";
+    var authBody = { email: $("authEmail").value, password: $("authPw").value };
+    if (authMode === "signup") authBody.nickname = $("authNick").value.trim();
     api("/api/auth/" + (authMode === "login" ? "login" : "register"), {
       method: "POST",
-      body: JSON.stringify({ email: $("authEmail").value, password: $("authPw").value })
+      body: JSON.stringify(authBody)
     }).then(function (r) {
       token = r.token;
       try { localStorage.setItem("tokenbill-token", token); } catch (e) {}
@@ -532,6 +556,18 @@
     },
     openGuide: function () { $("guideModal").classList.remove("hidden"); },
     closeGuide: function () { $("guideModal").classList.add("hidden"); },
+    openMy: function () {
+      if (me) { $("myEmail").textContent = me.email; $("myNick").value = me.nickname || ""; }
+      $("myModal").classList.remove("hidden");
+    },
+    closeMy: function () { $("myModal").classList.add("hidden"); },
+    saveNick: function () {
+      var v = $("myNick").value.trim();
+      if (!v) { toast("별명을 입력해 주세요"); return; }
+      api("/api/me", { method: "PATCH", body: JSON.stringify({ nickname: v }) })
+        .then(function () { toast("별명이 변경되었습니다"); tokenbill.closeMy(); return refreshAll(); })
+        .catch(function (e) { toast(e.message); });
+    },
     alertTest: function () {
       api("/api/alerts/test", { method: "POST" })
         .then(function () { toast("테스트 메일을 보냈습니다 — 받은편지함을 확인하세요"); })

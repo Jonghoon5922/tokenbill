@@ -48,12 +48,14 @@ def admin_user(user: models.User = Depends(current_user)) -> models.User:
 class AuthIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+    nickname: str | None = Field(default=None, max_length=32)  # 회원가입 시 선택 입력
 
 
 class SettingsIn(BaseModel):
     budget_usd: float | None = Field(default=None, ge=0)
     fx_rate: float | None = Field(default=None, gt=0)
     currency: str | None = Field(default=None, pattern="^(USD|KRW)$")
+    nickname: str | None = Field(default=None, max_length=32)  # ""이면 별명 해제
 
 
 class KeyIn(BaseModel):
@@ -99,7 +101,9 @@ def google_login(body: GoogleAuthIn, db: Session = Depends(get_db)):
     user = db.query(models.User).filter_by(email=email).first()
     if user is None:
         # 구글 가입 계정 — 비밀번호 로그인은 불가능한 무작위 해시로 채운다
-        user = models.User(email=email, password_hash=hash_password(secrets.token_hex(32)))
+        # 구글 계정 이름을 초기 별명으로 사용 (없으면 이메일 앞부분)
+        nick = (info.get("name") or "").strip()[:32] or email.split("@")[0][:32]
+        user = models.User(email=email, password_hash=hash_password(secrets.token_hex(32)), nickname=nick)
         db.add(user)
         db.commit()
     _maybe_promote_admin(user, db)
@@ -110,9 +114,12 @@ def google_login(body: GoogleAuthIn, db: Session = Depends(get_db)):
 def register(body: AuthIn, db: Session = Depends(get_db)):
     if AUTH_GOOGLE_ONLY and GOOGLE_CLIENT_ID:
         raise HTTPException(400, "구글 로그인만 지원합니다")
+    if not (body.nickname or "").strip():
+        raise HTTPException(400, "별명을 입력해 주세요")
     if db.query(models.User).filter_by(email=body.email.lower()).first():
         raise HTTPException(409, "이미 가입된 이메일입니다")
-    user = models.User(email=body.email.lower(), password_hash=hash_password(body.password))
+    user = models.User(email=body.email.lower(), password_hash=hash_password(body.password),
+                       nickname=(body.nickname or "").strip()[:32] or None)
     db.add(user)
     db.commit()
     return {"token": create_token(user.id)}
@@ -133,7 +140,8 @@ def login(body: AuthIn, db: Session = Depends(get_db)):
 @app.get("/api/me")
 def me(user: models.User = Depends(current_user)):
     return {
-        "email": user.email, "is_admin": user.is_admin, "budget_usd": user.budget_usd,
+        "email": user.email, "is_admin": user.is_admin, "nickname": user.nickname,
+        "budget_usd": user.budget_usd,
         "fx_rate": user.fx_rate, "currency": user.currency,
         "last_sync_at": user.last_sync_at.isoformat() + "Z" if user.last_sync_at else None,
         "cooldown_sec": cooldown_remaining_sec(user),
@@ -150,6 +158,11 @@ def update_me(body: SettingsIn, user: models.User = Depends(current_user), db: S
         user.fx_rate = body.fx_rate
     if body.currency is not None:
         user.currency = body.currency
+    if body.nickname is not None:
+        nick = body.nickname.strip()[:32]
+        if not nick:
+            raise HTTPException(400, "별명은 비울 수 없습니다")
+        user.nickname = nick
     db.commit()
     return {"ok": True}
 
@@ -335,8 +348,8 @@ def leaderboard(user: models.User = Depends(current_user), db: Session = Depends
         func.coalesce(func.sum(models.UsageDaily.input_tokens + models.UsageDaily.output_tokens), 0),
     ).filter(models.UsageDaily.day >= month_start).group_by(models.UsageDaily.user_id) \
      .order_by(func.sum(models.UsageDaily.input_tokens + models.UsageDaily.output_tokens).desc()).all()
-    emails = dict(db.query(models.User.id, models.User.email).all())
-    board = [{"rank": i + 1, "name": _mask_email(emails.get(uid, "?")), "tokens": int(t),
+    names = {u.id: (u.nickname or _mask_email(u.email)) for u in db.query(models.User).all()}
+    board = [{"rank": i + 1, "name": names.get(uid, "?"), "tokens": int(t),
               "tier": _tier(int(t)), "me": uid == user.id}
              for i, (uid, t) in enumerate(rows)]
     mine = next((b for b in board if b["me"]), None)
