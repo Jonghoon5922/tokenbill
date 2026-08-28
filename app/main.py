@@ -299,6 +299,58 @@ def usage_breakdown(user: models.User = Depends(current_user), db: Session = Dep
     ]
 
 
+# ── 리더보드 ────────────────────────────────────────────────
+TIERS = [  # (최소 토큰, 이모지, 칭호) — 큰 것부터
+    (1_000_000_000, "🌌", "AGI 소환자"),
+    (100_000_000, "🔥", "토큰 버너"),
+    (10_000_000, "⚡", "컨텍스트 마스터"),
+    (1_000_000, "🔨", "프롬프트 장인"),
+    (100_000, "📦", "토큰 수집가"),
+    (0, "🌱", "프롬프트 입문"),
+]
+
+
+def _tier(tokens: int) -> dict:
+    for min_tok, emoji, name in TIERS:
+        if tokens >= min_tok:
+            nxt = None
+            idx = TIERS.index((min_tok, emoji, name))
+            if idx > 0:
+                nxt = {"name": TIERS[idx - 1][2], "at": TIERS[idx - 1][0]}
+            return {"emoji": emoji, "name": name, "next": nxt}
+    return {"emoji": "🌱", "name": "프롬프트 입문", "next": None}
+
+
+def _mask_email(email: str) -> str:
+    local = email.split("@")[0]
+    return (local[:4] + "***") if len(local) > 4 else (local[:1] + "***")
+
+
+@app.get("/api/leaderboard")
+def leaderboard(user: models.User = Depends(current_user), db: Session = Depends(get_db)):
+    """이번 달 토큰 사용량 순위 — 이름은 마스킹, 본인 행만 식별 가능."""
+    month_start = date.today().replace(day=1)
+    rows = db.query(
+        models.UsageDaily.user_id,
+        func.coalesce(func.sum(models.UsageDaily.input_tokens + models.UsageDaily.output_tokens), 0),
+    ).filter(models.UsageDaily.day >= month_start).group_by(models.UsageDaily.user_id) \
+     .order_by(func.sum(models.UsageDaily.input_tokens + models.UsageDaily.output_tokens).desc()).all()
+    emails = dict(db.query(models.User.id, models.User.email).all())
+    board = [{"rank": i + 1, "name": _mask_email(emails.get(uid, "?")), "tokens": int(t),
+              "tier": _tier(int(t)), "me": uid == user.id}
+             for i, (uid, t) in enumerate(rows)]
+    mine = next((b for b in board if b["me"]), None)
+    my_tokens = mine["tokens"] if mine else 0
+    my_rank = mine["rank"] if mine else len(board) + 1
+    total = max(len(board), 1)
+    return {
+        "top": board[:10],
+        "me": {"rank": my_rank, "tokens": my_tokens, "tier": _tier(my_tokens),
+               "percentile": round(my_rank / total * 100)},
+        "total_users": len(board),
+    }
+
+
 # ── 관리자 ──────────────────────────────────────────────────
 @app.get("/api/admin/stats")
 def admin_stats(admin: models.User = Depends(admin_user), db: Session = Depends(get_db)):

@@ -140,6 +140,16 @@
   .atable tr:last-child td { border-bottom: none; }
   .atable .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 0.68rem; font-weight: 600; }
   .atable .del { padding: 4px 10px; font-size: 0.74rem; }
+  .mytier { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--chip); border-radius: 10px; margin-bottom: 12px; }
+  .mytier .emj { font-size: 1.9rem; line-height: 1; }
+  .mytier .tn { font-weight: 700; font-size: 0.95rem; }
+  .mytier .ts { font-size: 0.76rem; color: var(--ink-2); }
+  .lbrow { display: flex; align-items: center; gap: 10px; padding: 7px 4px; font-size: 0.83rem; border-bottom: 1px solid var(--grid); }
+  .lbrow:last-child { border-bottom: none; }
+  .lbrow.me { background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: 7px; font-weight: 600; }
+  .lbrow .rk { width: 26px; text-align: center; flex: none; }
+  .lbrow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lbrow .tk { font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; }
   .guide-link { color: var(--accent-ink); text-decoration: none; font-size: 0.8rem; }
   .guide-link:hover { text-decoration: underline; }
   .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 30; display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -254,6 +264,10 @@
         </h2>
         <div id="insightBox"></div>
       </section>
+      <section class="card">
+        <h2>🏆 토큰 리더보드 <span class="cnt">이번 달</span></h2>
+        <div id="lbBox"></div>
+      </section>
     </div>
   </div>
 
@@ -331,7 +345,7 @@
   try { token = localStorage.getItem("tokenbill-token"); } catch (e) {}
 
   // 서버 데이터 캐시
-  var me = null, providers = [], daily = [], modelRows = [], breakdown = [];
+  var me = null, providers = [], daily = [], modelRows = [], breakdown = [], lb = null;
   var modelView = "cost";
   var dailyView = "cost";
   var expandedOrgs = {};  // key_id → true (프로젝트 드릴다운 펼침 상태)
@@ -441,9 +455,9 @@
   function refreshAll() {
     return Promise.all([
       api("/api/me"), api("/api/providers"), api("/api/usage/daily?days=45"), api("/api/usage/models"),
-      api("/api/usage/breakdown")
+      api("/api/usage/breakdown"), api("/api/leaderboard")
     ]).then(function (rs) {
-      me = rs[0]; providers = rs[1]; daily = rs[2]; modelRows = rs[3]; breakdown = rs[4];
+      me = rs[0]; providers = rs[1]; daily = rs[2]; modelRows = rs[3]; breakdown = rs[4]; lb = rs[5];
       render();
     }).catch(function (e) { toast(e.message); });
   }
@@ -648,6 +662,32 @@
     renderDaily(map, connected);
     renderModels();
     renderInsights(connected, yesterday, prior7, projected, monthTotal, map);
+    renderLeaderboard();
+  }
+
+  function renderLeaderboard() {
+    var el = $("lbBox");
+    if (!lb) { el.innerHTML = ""; return; }
+    var m = lb.me, t = m.tier;
+    var nextTxt = t.next
+      ? "다음 티어 " + esc(t.next.name) + "까지 " + fmtTok(Math.max(0, t.next.at - m.tokens)) + " tok"
+      : "최고 티어 달성!";
+    var html = '<div class="mytier"><span class="emj">' + t.emoji + '</span>' +
+      '<div><div class="tn">' + esc(t.name) + '</div>' +
+      '<div class="ts">이번 달 ' + fmtTok(m.tokens) + ' tok · ' + m.rank + '위 / ' + lb.total_users + '명 (상위 ' + m.percentile + '%)</div>' +
+      '<div class="ts">' + nextTxt + '</div></div></div>';
+    if (!lb.top.length) {
+      html += '<p class="empty">아직 이번 달 사용 기록이 없습니다. 첫 토큰을 태워보세요! 🔥</p>';
+    } else {
+      var medals = ["🥇", "🥈", "🥉"];
+      html += lb.top.map(function (b) {
+        return '<div class="lbrow' + (b.me ? ' me' : '') + '">' +
+          '<span class="rk">' + (medals[b.rank - 1] || b.rank) + '</span>' +
+          '<span class="nm">' + (b.me ? '나 (' + esc(b.name) + ')' : esc(b.name)) + ' ' + b.tier.emoji + '</span>' +
+          '<span class="tk">' + fmtTok(b.tokens) + ' tok</span></div>';
+      }).join("");
+    }
+    el.innerHTML = html;
   }
 
   function renderSync(connected) {
