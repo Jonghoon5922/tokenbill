@@ -18,8 +18,8 @@ from .collector import cooldown_remaining_sec, sync_all_users, sync_user, MANUAL
 from .notify import alerts_available, send_email
 from .providers.collectors import fetch_org_name
 from .db import get_db, init_db
-from .security import (create_token, current_user, encrypt_key, hash_password,
-                       mask_key, verify_password)
+from .security import (create_token, current_user, decrypt_key, encrypt_key,
+                       hash_password, mask_key, verify_password)
 
 init_db()
 
@@ -210,6 +210,16 @@ def list_providers(user: models.User = Depends(current_user), db: Session = Depe
 
 @app.post("/api/providers")
 def add_provider(body: KeyIn, user: models.User = Depends(current_user), db: Session = Depends(get_db)):
+    # 같은 키 중복 등록 방지 — 사용량이 이중 집계되는 것을 막는다
+    for k in user.keys:
+        if k.provider == body.provider:
+            try:
+                if decrypt_key(k.key_encrypted) == body.api_key:
+                    raise HTTPException(409, f"이미 '{k.label}'(으)로 등록된 키입니다")
+            except HTTPException:
+                raise
+            except Exception:
+                pass  # 복호화 실패한 옛 키는 비교 불가 — 무시
     label = body.label.strip()
     existing_labels = {k.label for k in user.keys if k.provider == body.provider}
     if label and label in existing_labels:
