@@ -26,6 +26,19 @@ app = FastAPI(title="Tokenbill API", version="0.1.0")
 
 PROVIDERS = ["openai", "anthropic", "google"]
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")  # 설정하면 구글 로그인 활성화
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "").lower()    # 이 이메일 계정은 로그인 시 관리자로 자동 승격
+
+
+def _maybe_promote_admin(user: models.User, db: Session) -> None:
+    if ADMIN_EMAIL and user.email == ADMIN_EMAIL and not user.is_admin:
+        user.is_admin = True
+        db.commit()
+
+
+def admin_user(user: models.User = Depends(current_user)) -> models.User:
+    if not user.is_admin:
+        raise HTTPException(403, "관리자 권한이 필요합니다")
+    return user
 
 
 # ── 스키마 ──────────────────────────────────────────────────
@@ -82,6 +95,7 @@ def google_login(body: GoogleAuthIn, db: Session = Depends(get_db)):
         user = models.User(email=email, password_hash=hash_password(secrets.token_hex(32)))
         db.add(user)
         db.commit()
+    _maybe_promote_admin(user, db)
     return {"token": create_token(user.id)}
 
 
@@ -100,6 +114,7 @@ def login(body: AuthIn, db: Session = Depends(get_db)):
     user = db.query(models.User).filter_by(email=body.email.lower()).first()
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(401, "이메일 또는 비밀번호가 올바르지 않습니다")
+    _maybe_promote_admin(user, db)
     return {"token": create_token(user.id)}
 
 
@@ -107,7 +122,7 @@ def login(body: AuthIn, db: Session = Depends(get_db)):
 @app.get("/api/me")
 def me(user: models.User = Depends(current_user)):
     return {
-        "email": user.email, "budget_usd": user.budget_usd,
+        "email": user.email, "is_admin": user.is_admin, "budget_usd": user.budget_usd,
         "fx_rate": user.fx_rate, "currency": user.currency,
         "last_sync_at": user.last_sync_at.isoformat() + "Z" if user.last_sync_at else None,
         "cooldown_sec": cooldown_remaining_sec(user),
@@ -259,6 +274,66 @@ def usage_breakdown(user: models.User = Depends(current_user), db: Session = Dep
          "cost_usd": round(c, 4), "input_tokens": int(i), "output_tokens": int(o)}
         for k, p, pid, pname, m, c, i, o in rows
     ]
+
+
+# ── 관리자 ──────────────────────────────────────────────────
+@app.get("/api/admin/stats")
+def admin_stats(admin: models.User = Depends(admin_user), db: Session = Depends(get_db)):
+    month_start = date.today().replace(day=1)
+    by_provider = dict(db.query(
+        models.UsageDaily.provider, func.coalesce(func.sum(models.UsageDaily.cost_usd), 0.0),
+    ).filter(models.UsageDaily.day >= month_start).group_by(models.UsageDaily.provider).all())
+    return {
+        "users": db.query(func.count(models.User.id)).scalar(),
+        "keys": db.query(func.count(models.ProviderKey.id)).scalar(),
+        "month_cost_usd": round(sum(by_provider.values()), 4),
+        "month_cost_by_provider": {p: round(c, 4) for p, c in by_provider.items()},
+    }
+
+
+@app.get("/api/admin/users")
+def admin_users(admin: models.User = Depends(admin_user), db: Session = Depends(get_db)):
+    month_start = date.today().replace(day=1)
+    cost_by_user = dict(db.query(
+        models.UsageDaily.user_id, func.coalesce(func.sum(models.UsageDaily.cost_usd), 0.0),
+    ).filter(models.UsageDaily.day >= month_start).group_by(models.UsageDaily.user_id).all())
+    keys_by_user = dict(db.query(
+        models.ProviderKey.user_id, func.count(models.ProviderKey.id),
+    ).group_by(models.ProviderKey.user_id).all())
+    return [{
+        "id": u.id,
+        "email": u.email,
+        "is_admin": u.is_admin,
+        "created_at": u.created_at.isoformat() + "Z",
+        "last_sync_at": u.last_sync_at.isoformat() + "Z" if u.last_sync_at else None,
+        "keys": keys_by_user.get(u.id, 0),
+        "month_cost_usd": round(cost_by_user.get(u.id, 0.0), 4),
+    } for u in db.query(models.User).order_by(models.User.id).all()]
+
+
+@app.delete("/api/admin/users/{user_id}")
+def admin_delete_user(user_id: int, admin: models.User = Depends(admin_user), db: Session = Depends(get_db)):
+    if user_id == admin.id:
+        raise HTTPException(400, "본인 계정은 삭제할 수 없습니다")
+    target = db.get(models.User, user_id)
+    if target is None:
+        raise HTTPException(404, "사용자를 찾을 수 없습니다")
+    if target.is_admin:
+        raise HTTPException(400, "다른 관리자 계정은 삭제할 수 없습니다")
+    db.query(models.UsageDaily).filter_by(user_id=user_id).delete()
+    db.delete(target)  # provider_keys는 cascade로 함께 삭제
+    db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/admin/sync-all")
+def admin_sync_all(admin: models.User = Depends(admin_user), db: Session = Depends(get_db)):
+    """모든 사용자 즉시 재수집 (쿨다운 무시)."""
+    results = []
+    for u in db.query(models.User).all():
+        if u.keys:
+            results.append({"user_id": u.id, "email": u.email, "sync": sync_user(db, u)})
+    return {"ok": True, "synced_users": len(results), "results": results}
 
 
 # ── 정적 프론트엔드 ─────────────────────────────────────────

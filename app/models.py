@@ -4,7 +4,7 @@
 "날짜 × 프로바이더 × 모델" 단위의 요약 행(UsageDaily)만 보관한다.
 """
 from datetime import datetime, date
-from sqlalchemy import String, Float, Integer, Date, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Boolean, String, Float, Integer, Date, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
 
@@ -18,6 +18,7 @@ class User(Base):
     budget_usd: Mapped[float] = mapped_column(Float, default=100.0)
     fx_rate: Mapped[float] = mapped_column(Float, default=1380.0)
     currency: Mapped[str] = mapped_column(String(3), default="USD")
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 

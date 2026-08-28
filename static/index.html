@@ -133,6 +133,12 @@
   #googleBtn { display: flex; justify-content: center; }
   .hidden { display: none !important; }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--page); padding: 10px 18px; border-radius: 8px; font-size: 0.85rem; z-index: 20; display: none; }
+  .atable { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .atable th { text-align: left; padding: 8px 10px; color: var(--muted); font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  .atable td { padding: 9px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .atable tr:last-child td { border-bottom: none; }
+  .atable .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 0.68rem; font-weight: 600; }
+  .atable .del { padding: 4px 10px; font-size: 0.74rem; }
 </style>
 </head>
 <body>
@@ -175,6 +181,7 @@
       <input type="number" id="fxRate" min="1" step="10" aria-label="USD 대 KRW 환율">
       <label for="budget">월 예산 $</label>
       <input type="number" id="budget" min="0" step="10">
+      <button class="btn ghost hidden" id="adminBtn">관리자</button>
       <button class="btn ghost" id="logoutBtn">로그아웃</button>
     </div>
   </header>
@@ -238,6 +245,26 @@
   <footer class="ft">Tokenbill — OpenAI·Anthropic은 조직 Admin 키가 필요해요. "demo"로 시작하는 키를 넣으면 체험용 데이터가 생성됩니다.</footer>
 </div>
 </div>
+<!-- 관리자 -->
+<div id="adminView" class="hidden">
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Token<span class="won">bill</span> <span style="font-size:0.9rem;color:var(--muted);font-weight:500">관리자</span></h1>
+    </div>
+    <div class="hdr-ctls">
+      <button class="btn ghost" id="adminSyncBtn">전체 수집 실행</button>
+      <button class="btn" id="adminBackBtn">← 대시보드</button>
+    </div>
+  </header>
+  <div class="band" id="adminTiles"></div>
+  <section class="card">
+    <h2>사용자 <span class="cnt" id="adminUserCnt"></span></h2>
+    <div style="overflow-x:auto"><table class="atable" id="adminUserTable"></table></div>
+  </section>
+</div>
+</div>
+
 <div class="tooltip" id="tip"></div>
 <div class="toast" id="toast"></div>
 
@@ -305,9 +332,60 @@
     token = null;
     try { localStorage.removeItem("tokenbill-token"); } catch (e) {}
     $("dashView").classList.add("hidden");
+    $("adminView").classList.add("hidden");
     $("authView").classList.remove("hidden");
   }
   $("logoutBtn").addEventListener("click", logout);
+
+  // ── 관리자 화면 ──
+  function showAdmin() {
+    $("dashView").classList.add("hidden");
+    $("adminView").classList.remove("hidden");
+    Promise.all([api("/api/admin/stats"), api("/api/admin/users")])
+      .then(function (rs) { renderAdmin(rs[0], rs[1]); })
+      .catch(function (e) { toast(e.message); });
+  }
+  function renderAdmin(stats, users) {
+    var byProv = Object.keys(stats.month_cost_by_provider || {}).map(function (p) {
+      return (PROVIDERS[p] ? PROVIDERS[p].name : p) + " " + fmt(stats.month_cost_by_provider[p]);
+    }).join(" · ");
+    $("adminTiles").innerHTML =
+      '<div class="tile hero"><span class="lbl">이번 달 전체 비용</span><span class="val">' + fmt(stats.month_cost_usd) + '</span>' +
+      '<span class="sub">' + (byProv || "사용 내역 없음") + '</span></div>' +
+      '<div class="tile"><span class="lbl">사용자</span><span class="val">' + stats.users + '</span></div>' +
+      '<div class="tile"><span class="lbl">연결된 키</span><span class="val">' + stats.keys + '</span></div>' +
+      '<div class="tile"><span class="lbl">서버</span><span class="val" style="color:var(--good-ink)">정상</span><span class="sub">매일 03시 자동 수집</span></div>';
+    $("adminUserCnt").textContent = users.length + "명";
+    var ago = function (iso) {
+      if (!iso) return "—";
+      var m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+      return m < 1 ? "방금" : m < 60 ? m + "분 전" : m < 1440 ? Math.round(m / 60) + "시간 전" : Math.round(m / 1440) + "일 전";
+    };
+    $("adminUserTable").innerHTML =
+      '<tr><th>#</th><th>이메일</th><th>가입일</th><th>마지막 수집</th><th>키</th><th>이번 달</th><th></th></tr>' +
+      users.map(function (u) {
+        return '<tr><td>' + u.id + '</td>' +
+          '<td>' + esc(u.email) + (u.is_admin ? ' <span class="badge">관리자</span>' : '') + '</td>' +
+          '<td>' + u.created_at.slice(0, 10) + '</td>' +
+          '<td>' + ago(u.last_sync_at) + '</td>' +
+          '<td>' + u.keys + '</td>' +
+          '<td>' + fmt(u.month_cost_usd) + '</td>' +
+          '<td>' + (u.is_admin ? '' : '<button class="btn ghost del" onclick="tokenbill.adminDelete(' + u.id + ', \'' + esc(u.email) + '\')">삭제</button>') + '</td></tr>';
+      }).join("");
+  }
+  $("adminBtn").addEventListener("click", showAdmin);
+  $("adminBackBtn").addEventListener("click", function () {
+    $("adminView").classList.add("hidden");
+    $("dashView").classList.remove("hidden");
+    refreshAll();
+  });
+  $("adminSyncBtn").addEventListener("click", function () {
+    var btn = this; btn.disabled = true; btn.textContent = "수집 중…";
+    api("/api/admin/sync-all", { method: "POST" })
+      .then(function (r) { toast("전체 수집 완료 — " + r.synced_users + "명"); showAdmin(); })
+      .catch(function (e) { toast(e.message); })
+      .then(function () { btn.disabled = false; btn.textContent = "전체 수집 실행"; });
+  });
 
   // ── dashboard data ──
   function refreshAll() {
@@ -385,6 +463,12 @@
     toggleOrg: function (keyId, defOpen) {
       expandedOrgs[keyId] = !isOrgOpen(keyId, defOpen);
       render();
+    },
+    adminDelete: function (userId, email) {
+      if (!confirm(email + " 계정과 모든 데이터를 삭제할까요?")) return;
+      api("/api/admin/users/" + userId, { method: "DELETE" })
+        .then(function () { toast("삭제 완료"); showAdmin(); })
+        .catch(function (e) { toast(e.message); });
     }
   };
 
@@ -459,6 +543,7 @@
     $("curKRW").className = me.currency === "KRW" ? "on" : "";
     if (document.activeElement !== $("fxRate")) $("fxRate").value = me.fx_rate;
     if (document.activeElement !== $("budget")) $("budget").value = me.budget_usd;
+    $("adminBtn").classList.toggle("hidden", !me.is_admin);
 
     var connected = providers.filter(function (p) { return p.connected; }).map(function (p) { return p.provider; });
     var map = dayMap();
