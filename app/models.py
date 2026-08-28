@@ -19,6 +19,9 @@ class User(Base):
     fx_rate: Mapped[float] = mapped_column(Float, default=1380.0)
     currency: Mapped[str] = mapped_column(String(3), default="USD")
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    # 예산 알림 (이메일)
+    alert_month: Mapped[str | None] = mapped_column(String(7), nullable=True)   # 알림 이력 기준 달 (YYYY-MM)
+    alert_level: Mapped[int] = mapped_column(Integer, default=0)                # 0=없음 1=80% 2=100% 발송됨
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 

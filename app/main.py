@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from . import models
 from .collector import cooldown_remaining_sec, sync_all_users, sync_user, MANUAL_COOLDOWN_MIN
+from .notify import alerts_available, send_email
 from .providers.collectors import fetch_org_name
 from .db import get_db, init_db
 from .security import (create_token, current_user, encrypt_key, hash_password,
@@ -27,6 +28,8 @@ app = FastAPI(title="Tokenbill API", version="0.1.0")
 PROVIDERS = ["openai", "anthropic", "google"]
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")  # 설정하면 구글 로그인 활성화
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "").lower()    # 이 이메일 계정은 로그인 시 관리자로 자동 승격
+# AUTH_GOOGLE_ONLY=1 이면 이메일/비밀번호 가입·로그인을 막고 구글 로그인만 허용
+AUTH_GOOGLE_ONLY = os.environ.get("AUTH_GOOGLE_ONLY", "") == "1"
 
 
 def _maybe_promote_admin(user: models.User, db: Session) -> None:
@@ -67,7 +70,11 @@ class GoogleAuthIn(BaseModel):
 @app.get("/api/auth/config")
 def auth_config():
     """로그인 화면 설정 — 구글 클라이언트 ID가 있으면 프론트가 구글 버튼을 띄운다."""
-    return {"google_client_id": GOOGLE_CLIENT_ID or None}
+    return {
+        "google_client_id": GOOGLE_CLIENT_ID or None,
+        # 구글이 설정되지 않았는데 전용 모드를 켜면 잠기므로, 둘 다 충족할 때만 전용 모드
+        "google_only": bool(AUTH_GOOGLE_ONLY and GOOGLE_CLIENT_ID),
+    }
 
 
 @app.post("/api/auth/google")
@@ -101,6 +108,8 @@ def google_login(body: GoogleAuthIn, db: Session = Depends(get_db)):
 
 @app.post("/api/auth/register")
 def register(body: AuthIn, db: Session = Depends(get_db)):
+    if AUTH_GOOGLE_ONLY and GOOGLE_CLIENT_ID:
+        raise HTTPException(400, "구글 로그인만 지원합니다")
     if db.query(models.User).filter_by(email=body.email.lower()).first():
         raise HTTPException(409, "이미 가입된 이메일입니다")
     user = models.User(email=body.email.lower(), password_hash=hash_password(body.password))
@@ -111,6 +120,8 @@ def register(body: AuthIn, db: Session = Depends(get_db)):
 
 @app.post("/api/auth/login")
 def login(body: AuthIn, db: Session = Depends(get_db)):
+    if AUTH_GOOGLE_ONLY and GOOGLE_CLIENT_ID:
+        raise HTTPException(400, "구글 로그인만 지원합니다")
     user = db.query(models.User).filter_by(email=body.email.lower()).first()
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(401, "이메일 또는 비밀번호가 올바르지 않습니다")
@@ -127,6 +138,7 @@ def me(user: models.User = Depends(current_user)):
         "last_sync_at": user.last_sync_at.isoformat() + "Z" if user.last_sync_at else None,
         "cooldown_sec": cooldown_remaining_sec(user),
         "cooldown_min": MANUAL_COOLDOWN_MIN,
+        "alerts_available": alerts_available(),
     }
 
 
@@ -139,6 +151,17 @@ def update_me(body: SettingsIn, user: models.User = Depends(current_user), db: S
     if body.currency is not None:
         user.currency = body.currency
     db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/alerts/test")
+def alert_test(user: models.User = Depends(current_user)):
+    if not alerts_available():
+        raise HTTPException(400, "서버에 이메일 발송(SMTP)이 설정되지 않았습니다")
+    ok = send_email(user.email, "✅ Tokenbill 알림 테스트",
+                    "예산의 80%·100% 도달 시 이 주소로 알림 메일이 발송됩니다.")
+    if not ok:
+        raise HTTPException(502, "발송 실패 — 서버 SMTP 설정을 확인해 주세요")
     return {"ok": True}
 
 

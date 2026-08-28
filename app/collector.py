@@ -8,6 +8,7 @@ from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from . import models
+from .notify import check_budget_alert
 from .security import decrypt_key
 from .providers.collectors import collect, CollectError
 
@@ -56,6 +57,7 @@ def sync_user(db: Session, user: models.User) -> list[dict]:
         results.append(entry)
     user.last_sync_at = datetime.utcnow()
     db.commit()
+    check_budget_alert(db, user)  # 수집 직후 예산 80%/100% 도달 여부 확인
     return results
 
 
