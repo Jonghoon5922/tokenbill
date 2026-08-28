@@ -213,7 +213,11 @@
   <div class="cols">
     <div>
       <section class="card">
-        <h2>일별 비용 <span class="cnt">최근 30일 · 프로바이더별</span></h2>
+        <h2>일별 사용량 <span class="cnt">최근 30일 · 프로바이더별</span>
+          <span class="cur-toggle" role="group" aria-label="일별 보기 기준" style="margin-left:auto">
+            <button id="dvCost" class="on">비용</button><button id="dvTok">토큰</button>
+          </span>
+        </h2>
         <div class="legend" id="dailyLegend"></div>
         <div id="dailyChart"></div>
         <p class="chart-note">막대에 마우스를 올리면 상세 내역이 표시됩니다.</p>
@@ -284,6 +288,7 @@
   // 서버 데이터 캐시
   var me = null, providers = [], daily = [], modelRows = [], breakdown = [];
   var modelView = "cost";
+  var dailyView = "cost";
   var expandedOrgs = {};  // key_id → true (프로젝트 드릴다운 펼침 상태)
 
   // ── API helper ──
@@ -419,6 +424,8 @@
   $("curKRW").addEventListener("click", function () { patchMe({ currency: "KRW" }); });
   $("mvCost").addEventListener("click", function () { modelView = "cost"; render(); });
   $("mvTok").addEventListener("click", function () { modelView = "tok"; render(); });
+  $("dvCost").addEventListener("click", function () { dailyView = "cost"; render(); });
+  $("dvTok").addEventListener("click", function () { dailyView = "tok"; render(); });
 
   function syncErrors(sync) {
     return (sync || []).filter(function (s) { return !s.ok; }).map(function (s) {
@@ -684,16 +691,20 @@
       var d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
       days.push(iso(d));
     }
-    var max = 1;
+    $("dvCost").className = dailyView === "cost" ? "on" : "";
+    $("dvTok").className = dailyView === "tok" ? "on" : "";
+    var val = function (r) { return dailyView === "tok" ? r.tok : r.cost; };
+    var max = 0;
     days.forEach(function (dt) {
       var rec = map[dt], t = 0;
-      if (rec) for (var pid in rec) t += rec[pid].cost;
+      if (rec) for (var pid in rec) t += val(rec[pid]);
       if (t > max) max = t;
     });
+    if (max <= 0) max = 1;  // 데이터가 전무할 때만 기본 눈금
 
     var W = 560, H = 200, padT = 12, padB = 24, padL = 4, padR = 4;
     var plotH = H - padT - padB, cw = (W - padL - padR) / 30, bw = cw * 0.68;
-    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto" role="img" aria-label="최근 30일 일별 API 비용">';
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto" role="img" aria-label="최근 30일 일별 API 사용량">';
     for (var g = 1; g <= 3; g++) {
       var gy = padT + plotH * (1 - g / 3);
       svg += '<line x1="' + padL + '" y1="' + gy + '" x2="' + (W - padR) + '" y2="' + gy + '" stroke="var(--grid)"/>';
@@ -703,7 +714,7 @@
       var x = padL + cw * idx + (cw - bw) / 2;
       var yBase = H - padB, acc = 0;
       connected.forEach(function (pid, si) {
-        var v = rec[pid] ? rec[pid].cost : 0;
+        var v = rec[pid] ? val(rec[pid]) : 0;
         if (v <= 0) return;
         var h = (v / max) * plotH;
         var gapOffset = si > 0 ? 2 : 0;
