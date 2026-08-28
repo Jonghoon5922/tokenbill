@@ -412,7 +412,9 @@
   // ── formatting ──
   function fmt(usd) {
     if (me && me.currency === "KRW") return "₩" + Math.round(usd * me.fx_rate).toLocaleString("ko-KR");
-    return "$" + (usd >= 100 ? Math.round(usd).toLocaleString() : usd.toFixed(2));
+    if (usd >= 100) return "$" + Math.round(usd).toLocaleString();
+    if (usd >= 1 || usd === 0) return "$" + usd.toFixed(2);
+    return "$" + usd.toFixed(4);  // $1 미만은 4자리 — 반올림으로 합계가 안 맞아 보이는 것 방지
   }
   function fmtTok(n) {
     if (n >= 1e9) return (n / 1e9).toFixed(1) + "B";
