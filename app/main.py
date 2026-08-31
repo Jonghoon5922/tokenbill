@@ -632,9 +632,12 @@ def uploader_me(request: Request, db: Session = Depends(get_db)):
 def leaderboard_public(request: Request, db: Session = Depends(get_db)):
     """로그인 없이 볼 수 있는 리더보드 — 별명·티어·토큰량만 노출."""
     rate_limit(request, "pub-lb", 30, 60)
-    board_all, _, _ = _boards(db)
+    _, board_api, board_sub = _boards(db)
+    def pack(board):
+        return [{k: v for k, v in b.items() if k not in ("uid", "has_sub")} for b in board[:5]]
     return {
-        "top": [{k: v for k, v in b.items() if k != "uid"} for b in board_all[:10]],
+        "top_api": pack(board_api),
+        "top_sub": pack(board_sub),
         "total_users": db.query(func.count(models.User.id)).scalar(),
     }
 

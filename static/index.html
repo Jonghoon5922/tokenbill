@@ -1270,14 +1270,20 @@
   // ── 로그인 화면 공개 리더보드 ──
   if (!token) {
     api("/api/leaderboard/public").then(function (r) {
-      if (!r.top.length) return;
+      if (!r.top_api.length && !r.top_sub.length) return;
       var medals = ["🥇", "🥈", "🥉"];
-      $("pubLb").innerHTML = r.top.slice(0, 5).map(function (b) {
-        return '<div class="lbrow"><span class="rk">' + (medals[b.rank - 1] || b.rank) + '</span>' +
-          '<span class="nm">' + esc(b.name) + ' ' + b.tier.emoji + (b.has_sub ? ' 🖥️' : '') +
-          ' <span style="color:var(--muted);font-size:0.74rem">' + esc(b.tier.name) + '</span></span>' +
-          '<span class="tk">' + fmtTok(b.tokens) + ' tok</span></div>';
-      }).join("");
+      function rows(board) {
+        return board.slice(0, 3).map(function (b) {
+          return '<div class="lbrow"><span class="rk">' + (medals[b.rank - 1] || b.rank) + '</span>' +
+            '<span class="nm">' + esc(b.name) + ' ' + b.tier.emoji +
+            ' <span style="color:var(--muted);font-size:0.74rem">' + esc(b.tier.name) + '</span></span>' +
+            '<span class="tk">' + fmtTok(b.tokens) + ' tok</span></div>';
+        }).join("");
+      }
+      var html = "";
+      if (r.top_api.length) html += '<p class="chart-note" style="margin:2px 0 4px"><b>✅ API</b></p>' + rows(r.top_api);
+      if (r.top_sub.length) html += '<p class="chart-note" style="margin:10px 0 4px"><b>🖥️ 구독</b></p>' + rows(r.top_sub);
+      $("pubLb").innerHTML = html;
       $("pubLbCard").classList.remove("hidden");
     }).catch(function () {});
   }
