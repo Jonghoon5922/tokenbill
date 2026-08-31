@@ -12,7 +12,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from . import models
@@ -386,28 +386,56 @@ def _mask_email(email: str) -> str:
     return (local[:4] + "***") if len(local) > 4 else (local[:1] + "***")
 
 
+def _month_token_rows(db: Session):
+    """사용자별 (전체 토큰, API 검증 토큰) — API = 프로바이더가 직접 집계한 종량제 데이터."""
+    month_start = date.today().replace(day=1)
+    tok = models.UsageDaily.input_tokens + models.UsageDaily.output_tokens
+    api_tok = case((models.UsageDaily.provider.in_(PROVIDERS), tok), else_=0)
+    return db.query(
+        models.UsageDaily.user_id,
+        func.coalesce(func.sum(tok), 0),
+        func.coalesce(func.sum(api_tok), 0),
+    ).filter(models.UsageDaily.day >= month_start).group_by(models.UsageDaily.user_id).all()
+
+
+def _boards(db: Session):
+    rows = _month_token_rows(db)
+    names = {u.id: (u.nickname or _mask_email(u.email)) for u in db.query(models.User).all()}
+    def build(key):
+        ordered = sorted(((uid, int(t), int(a)) for uid, t, a in rows),
+                         key=lambda r: r[1] if key == "all" else r[2], reverse=True)
+        out = []
+        for i, (uid, t, a) in enumerate(ordered):
+            tokens = t if key == "all" else a
+            if key == "api" and tokens <= 0:
+                continue
+            out.append({"rank": len(out) + 1, "uid": uid, "name": names.get(uid, "?"),
+                        "tokens": tokens, "tier": _tier(tokens), "has_sub": t > a})
+        return out
+    return build("all"), build("api")
+
+
 @app.get("/api/leaderboard")
 def leaderboard(user: models.User = Depends(current_user), db: Session = Depends(get_db)):
-    """이번 달 토큰 사용량 순위 — 이름은 마스킹, 본인 행만 식별 가능."""
-    month_start = date.today().replace(day=1)
-    rows = db.query(
-        models.UsageDaily.user_id,
-        func.coalesce(func.sum(models.UsageDaily.input_tokens + models.UsageDaily.output_tokens), 0),
-    ).filter(models.UsageDaily.day >= month_start).group_by(models.UsageDaily.user_id) \
-     .order_by(func.sum(models.UsageDaily.input_tokens + models.UsageDaily.output_tokens).desc()).all()
-    names = {u.id: (u.nickname or _mask_email(u.email)) for u in db.query(models.User).all()}
-    board = [{"rank": i + 1, "name": names.get(uid, "?"), "tokens": int(t),
-              "tier": _tier(int(t)), "me": uid == user.id}
-             for i, (uid, t) in enumerate(rows)]
-    mine = next((b for b in board if b["me"]), None)
+    """이번 달 토큰 순위 — 전체(구독 포함)와 검증(API만) 투 트랙."""
+    board_all, board_api = _boards(db)
+    def pack(board):
+        return [{k: v for k, v in b.items() if k != "uid"} | {"me": b["uid"] == user.id}
+                for b in board[:10]]
+    mine = next((b for b in board_all if b["uid"] == user.id), None)
+    mine_api = next((b for b in board_api if b["uid"] == user.id), None)
     my_tokens = mine["tokens"] if mine else 0
-    my_rank = mine["rank"] if mine else len(board) + 1
-    total = max(len(board), 1)
+    my_rank = mine["rank"] if mine else len(board_all) + 1
+    total = max(len(board_all), 1)
     return {
-        "top": board[:10],
+        "top": pack(board_all),
+        "top_api": pack(board_api),
         "me": {"rank": my_rank, "tokens": my_tokens, "tier": _tier(my_tokens),
-               "percentile": round(my_rank / total * 100)},
-        "total_users": len(board),
+               "percentile": round(my_rank / total * 100),
+               "api_rank": mine_api["rank"] if mine_api else None,
+               "api_tokens": mine_api["tokens"] if mine_api else 0},
+        "total_users": len(board_all),
+        "total_api_users": len(board_api),
     }
 
 
@@ -534,16 +562,9 @@ def uploader_me(request: Request, db: Session = Depends(get_db)):
 def leaderboard_public(request: Request, db: Session = Depends(get_db)):
     """로그인 없이 볼 수 있는 리더보드 — 별명·티어·토큰량만 노출."""
     rate_limit(request, "pub-lb", 30, 60)
-    month_start = date.today().replace(day=1)
-    rows = db.query(
-        models.UsageDaily.user_id,
-        func.coalesce(func.sum(models.UsageDaily.input_tokens + models.UsageDaily.output_tokens), 0),
-    ).filter(models.UsageDaily.day >= month_start).group_by(models.UsageDaily.user_id) \
-     .order_by(func.sum(models.UsageDaily.input_tokens + models.UsageDaily.output_tokens).desc()).limit(10).all()
-    names = {u.id: (u.nickname or _mask_email(u.email)) for u in db.query(models.User).all()}
+    board_all, _ = _boards(db)
     return {
-        "top": [{"rank": i + 1, "name": names.get(uid, "?"), "tokens": int(t), "tier": _tier(int(t))}
-                for i, (uid, t) in enumerate(rows)],
+        "top": [{k: v for k, v in b.items() if k != "uid"} for b in board_all[:10]],
         "total_users": db.query(func.count(models.User.id)).scalar(),
     }
 

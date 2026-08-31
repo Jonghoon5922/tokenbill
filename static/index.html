@@ -291,7 +291,11 @@
         <div id="insightBox"></div>
       </section>
       <section class="card">
-        <h2>🏆 토큰 리더보드 <span class="cnt">이번 달</span></h2>
+        <h2>🏆 토큰 리더보드 <span class="cnt">이번 달</span>
+          <span class="cur-toggle" role="group" aria-label="리더보드 트랙" style="margin-left:auto">
+            <button id="lbAll" class="on">전체</button><button id="lbApi">✅ 검증</button>
+          </span>
+        </h2>
         <div id="lbBox"></div>
       </section>
     </div>
@@ -434,6 +438,7 @@
   var me = null, providers = [], daily = [], modelRows = [], breakdown = [], lb = null;
   var modelView = "cost";
   var dailyView = "cost";
+  var lbTrack = "all";  // all(구독 포함) | api(프로바이더 검증)
   var expandedOrgs = {};  // key_id → true (프로젝트 드릴다운 펼침 상태)
 
   // ── API helper ──
@@ -575,6 +580,8 @@
   $("mvTok").addEventListener("click", function () { modelView = "tok"; render(); });
   $("dvCost").addEventListener("click", function () { dailyView = "cost"; render(); });
   $("dvTok").addEventListener("click", function () { dailyView = "tok"; render(); });
+  $("lbAll").addEventListener("click", function () { lbTrack = "all"; render(); });
+  $("lbApi").addEventListener("click", function () { lbTrack = "api"; render(); });
 
   function syncErrors(sync) {
     return (sync || []).filter(function (s) { return !s.ok; }).map(function (s) {
@@ -817,24 +824,38 @@
   function renderLeaderboard() {
     var el = $("lbBox");
     if (!lb) { el.innerHTML = ""; return; }
+    $("lbAll").className = lbTrack === "all" ? "on" : "";
+    $("lbApi").className = lbTrack === "api" ? "on" : "";
     var m = lb.me, t = m.tier;
     var nextTxt = t.next
       ? "다음 티어 " + esc(t.next.name) + "까지 " + fmtTok(Math.max(0, t.next.at - m.tokens)) + " tok"
       : "최고 티어 달성!";
+    var apiTxt = m.api_rank
+      ? "✅ 검증 트랙: " + fmtTok(m.api_tokens) + " tok · " + m.api_rank + "위 / " + lb.total_api_users + "명"
+      : "✅ 검증 트랙: API 연동 시 진입 (프로바이더가 보증하는 수치)";
     var html = '<div class="mytier"><span class="emj">' + t.emoji + '</span>' +
       '<div><div class="tn">' + esc(t.name) + '</div>' +
       '<div class="ts">이번 달 ' + fmtTok(m.tokens) + ' tok · ' + m.rank + '위 / ' + lb.total_users + '명 (상위 ' + m.percentile + '%)</div>' +
-      '<div class="ts">' + nextTxt + '</div></div></div>';
-    if (!lb.top.length) {
-      html += '<p class="empty">아직 이번 달 사용 기록이 없습니다. 첫 토큰을 태워보세요! 🔥</p>';
+      '<div class="ts">' + nextTxt + '</div>' +
+      '<div class="ts">' + apiTxt + '</div></div></div>';
+    var board = lbTrack === "api" ? lb.top_api : lb.top;
+    if (!board.length) {
+      html += lbTrack === "api"
+        ? '<p class="empty">아직 검증(API) 사용 기록이 없습니다 — Admin 키를 연동해 보세요.</p>'
+        : '<p class="empty">아직 이번 달 사용 기록이 없습니다. 첫 토큰을 태워보세요! 🔥</p>';
     } else {
       var medals = ["🥇", "🥈", "🥉"];
-      html += lb.top.map(function (b) {
+      html += board.map(function (b) {
+        var badge = lbTrack === "all" && b.has_sub ? ' <span title="구독(자기 신고) 사용량 포함">🖥️</span>' : '';
         return '<div class="lbrow' + (b.me ? ' me' : '') + '">' +
           '<span class="rk">' + (medals[b.rank - 1] || b.rank) + '</span>' +
-          '<span class="nm">' + (b.me ? '나 (' + esc(b.name) + ')' : esc(b.name)) + ' ' + b.tier.emoji + '</span>' +
+          '<span class="nm">' + (b.me ? '나 (' + esc(b.name) + ')' : esc(b.name)) + ' ' + b.tier.emoji + badge + '</span>' +
           '<span class="tk">' + fmtTok(b.tokens) + ' tok</span></div>';
       }).join("");
+      html += '<p class="chart-note" style="margin-top:8px">' +
+        (lbTrack === "api"
+          ? '프로바이더 API가 직접 집계한 검증된 수치만 반영됩니다.'
+          : '🖥️ = 구독 CLI(자기 신고) 사용량 포함 · 검증된 수치만 보려면 ✅ 검증 탭') + '</p>';
     }
     el.innerHTML = html;
   }
@@ -1097,7 +1118,8 @@
       var medals = ["🥇", "🥈", "🥉"];
       $("pubLb").innerHTML = r.top.slice(0, 5).map(function (b) {
         return '<div class="lbrow"><span class="rk">' + (medals[b.rank - 1] || b.rank) + '</span>' +
-          '<span class="nm">' + esc(b.name) + ' ' + b.tier.emoji + ' <span style="color:var(--muted);font-size:0.74rem">' + esc(b.tier.name) + '</span></span>' +
+          '<span class="nm">' + esc(b.name) + ' ' + b.tier.emoji + (b.has_sub ? ' 🖥️' : '') +
+          ' <span style="color:var(--muted);font-size:0.74rem">' + esc(b.tier.name) + '</span></span>' +
           '<span class="tk">' + fmtTok(b.tokens) + ' tok</span></div>';
       }).join("");
       $("pubLbCard").classList.remove("hidden");
