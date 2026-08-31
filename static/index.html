@@ -869,6 +869,35 @@
       return '<div class="prov"><span class="dot" style="background:' + meta.color + ';opacity:0.35"></span>' +
         '<div class="nm" style="color:var(--muted)">' + meta.name + '</div>' +
         '<button class="btn" onclick="tokenbill.showKeyForm(\'' + p.provider + '\')">키 등록</button></div>' + keyform;
+    }).join("") + renderSubSources();
+  }
+
+  // 구독 사용량(MCP 업로드) 소스 — key_id 없는 breakdown 행에서 도출
+  function renderSubSources() {
+    var bySrc = {};
+    breakdown.forEach(function (r) {
+      if (r.key_id !== null) return;
+      var s = bySrc[r.provider] = bySrc[r.provider] || { tokens: 0, models: [] };
+      s.tokens += r.input_tokens + r.output_tokens;
+      s.models.push({ model: r.model, tok: r.input_tokens + r.output_tokens });
+    });
+    return Object.keys(bySrc).map(function (src) {
+      var s = bySrc[src], meta = provMeta(src);
+      var oid = "sub:" + src;
+      var open = isOrgOpen(oid, false);
+      s.models.sort(function (a, b) { return b.tok - a.tok; });
+      var html = '<div class="prov"><span class="dot" style="background:' + meta.color + '"></span>' +
+        '<div class="nm" style="cursor:pointer" onclick="tokenbill.toggleOrg(\'' + oid + '\', false)">' +
+        '<span class="arrow" style="display:inline-block;width:14px;color:var(--muted);font-size:0.7rem">' + (open ? '▾' : '▸') + '</span>' + meta.name +
+        '<span class="key">MCP 자동 업로드 · 구독</span></div>' +
+        '<div class="amt">' + fmtTok(s.tokens) + ' tok<span class="cap">이번 달</span></div></div>';
+      if (open) {
+        html += '<div class="projbox flat">' + s.models.map(function (m) {
+          return '<div class="mline"><span class="mnm">' + esc(m.model) + '</span>' +
+            '<span class="mv">' + fmtTok(m.tok) + ' tok</span></div>';
+        }).join("") + '</div>';
+      }
+      return html;
     }).join("");
   }
 
