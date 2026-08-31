@@ -314,6 +314,10 @@
         <div id="insightBox"></div>
       </section>
       <section class="card">
+        <h2>🌐 AI 활용 통계 <span class="cnt">이번 달 · 전체 사용자</span></h2>
+        <div id="aiStatsBox"></div>
+      </section>
+      <section class="card">
         <h2>🏆 토큰 리더보드 <span class="cnt">이번 달</span>
           <span class="cur-toggle" role="group" aria-label="리더보드 트랙" style="margin-left:auto">
             <button id="lbApi" class="on">✅ API</button><button id="lbSub">🖥️ 구독</button>
@@ -472,7 +476,7 @@
   try { token = localStorage.getItem("tokenbill-token"); } catch (e) {}
 
   // 서버 데이터 캐시
-  var me = null, providers = [], daily = [], modelRows = [], breakdown = [], lb = null;
+  var me = null, providers = [], daily = [], modelRows = [], breakdown = [], lb = null, aiStats = null;
   var modelView = "cost";
   var dailyView = "cost";
   var lbTrack = "api";  // api(프로바이더 검증) | sub(구독)
@@ -591,9 +595,9 @@
     var mq = "?month=" + viewMonth;
     return Promise.all([
       api("/api/me"), api("/api/providers" + mq), api("/api/usage/daily" + mq), api("/api/usage/models" + mq),
-      api("/api/usage/breakdown" + mq), api("/api/leaderboard")
+      api("/api/usage/breakdown" + mq), api("/api/leaderboard"), api("/api/stats/ai")
     ]).then(function (rs) {
-      me = rs[0]; providers = rs[1]; daily = rs[2]; modelRows = rs[3]; breakdown = rs[4]; lb = rs[5];
+      me = rs[0]; providers = rs[1]; daily = rs[2]; modelRows = rs[3]; breakdown = rs[4]; lb = rs[5]; aiStats = rs[6];
       render();
     }).catch(function (e) { toast(e.message); });
   }
@@ -890,7 +894,32 @@
     renderModels();
     renderSubModels();
     renderInsights(apiActive, yesterday, prior7, projected, monthTotal, map);
+    renderAiStats();
     renderLeaderboard();
+  }
+
+  function renderAiStats() {
+    var el = $("aiStatsBox");
+    if (!aiStats) { el.innerHTML = ""; return; }
+    function section(title, data) {
+      var n = data.active_users;
+      if (!n || !data.sources.length) {
+        return '<p class="chart-note" style="margin:4px 0 10px">' + title + ' — 아직 활성 사용자가 없습니다.</p>';
+      }
+      var totalTok = data.sources.reduce(function (s, e) { return s + e.tokens; }, 0) || 1;
+      var html = '<p class="chart-note" style="margin:4px 0 6px"><b>' + title + '</b> · 활성 ' + n + '명' +
+        (n < 10 ? ' <span style="color:var(--warn-ink)">— 표본이 작아 참고용입니다</span>' : '') + '</p>';
+      html += data.sources.map(function (e) {
+        var pct = Math.round(e.users / n * 100);
+        var tokPct = Math.round(e.tokens / totalTok * 100);
+        return '<div class="hbar-row"><span class="nm" style="font-family:inherit;font-size:0.8rem">' + provMeta(e.provider).name + '</span>' +
+          '<div class="hbar-track"><div class="hbar-fill" style="width:' + Math.max(3, pct) + '%;background:' + provMeta(e.provider).color + '"></div></div>' +
+          '<span class="v">' + pct + '% (' + e.users + '명) · 토큰 ' + tokPct + '%</span></div>';
+      }).join("");
+      return html;
+    }
+    el.innerHTML = section("✅ API", aiStats.api) + '<div style="height:10px"></div>' + section("🖥️ 구독", aiStats.sub) +
+      '<p class="chart-note" style="margin-top:8px">사용자 비율 = 이번 달 해당 AI 사용 기록이 있는 사용자 / 트랙 활성 사용자 (막대). 토큰 %는 양 기준 보조 지표.</p>';
   }
 
   function renderLeaderboard() {

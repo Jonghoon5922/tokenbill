@@ -470,6 +470,45 @@ def leaderboard(user: models.User = Depends(current_user), db: Session = Depends
     }
 
 
+# ── 전체 사용자 AI 활용 통계 ────────────────────────────────
+@app.get("/api/stats/ai")
+def ai_stats(request: Request, user: models.User = Depends(current_user), db: Session = Depends(get_db)):
+    """이번 달 전체 사용자의 AI별 활용 통계 (익명 집계).
+
+    표본 설계: ① 주 지표는 '사용자 비율'(헤비유저 왜곡 방지) ② API/구독 트랙 분리
+    ③ 트랙별 활성 사용자 수를 함께 반환해 표본 크기를 화면에 명시.
+    """
+    rate_limit(request, "ai-stats", 30, 60)
+    month_start = date.today().replace(day=1)
+    tok = models.UsageDaily.input_tokens + models.UsageDaily.output_tokens
+    rows = db.query(
+        models.UsageDaily.provider,
+        func.count(func.distinct(models.UsageDaily.user_id)),
+        func.coalesce(func.sum(tok), 0),
+    ).filter(models.UsageDaily.day >= month_start).group_by(models.UsageDaily.provider).all()
+
+    def track_users(api: bool):
+        q = db.query(func.count(func.distinct(models.UsageDaily.user_id))).filter(
+            models.UsageDaily.day >= month_start,
+            models.UsageDaily.provider.in_(PROVIDERS) if api
+            else ~models.UsageDaily.provider.in_(PROVIDERS),
+        )
+        return q.scalar() or 0
+
+    api_users, sub_users = track_users(True), track_users(False)
+    api_sources, sub_sources = [], []
+    for provider, users, tokens in rows:
+        entry = {"provider": provider, "users": int(users), "tokens": int(tokens)}
+        (api_sources if provider in PROVIDERS else sub_sources).append(entry)
+    api_sources.sort(key=lambda e: (-e["users"], -e["tokens"]))
+    sub_sources.sort(key=lambda e: (-e["users"], -e["tokens"]))
+    return {
+        "month": month_start.strftime("%Y-%m"),
+        "api": {"active_users": api_users, "sources": api_sources},
+        "sub": {"active_users": sub_users, "sources": sub_sources},
+    }
+
+
 # ── 피드백 → GitHub Issues ─────────────────────────────────
 class FeedbackIn(BaseModel):
     kind: str = Field(pattern="^(bug|idea)$")
