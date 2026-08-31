@@ -548,14 +548,14 @@
       .catch(function (e) { toast(e.message); });
   }
   function renderAdmin(stats, users) {
-    var byProv = Object.keys(stats.month_cost_by_provider || {}).map(function (p) {
-      return (PROVIDERS[p] ? PROVIDERS[p].name : p) + " " + fmt(stats.month_cost_by_provider[p]);
-    }).join(" · ");
+    var totalTok = stats.month_tokens_api + stats.month_tokens_sub;
     $("adminTiles").innerHTML =
-      '<div class="tile hero"><span class="lbl">이번 달 전체 비용</span><span class="val">' + fmt(stats.month_cost_usd) + '</span>' +
-      '<span class="sub">' + (byProv || "사용 내역 없음") + '</span></div>' +
-      '<div class="tile"><span class="lbl">사용자</span><span class="val">' + stats.users + '</span></div>' +
-      '<div class="tile"><span class="lbl">연결된 키</span><span class="val">' + stats.keys + '</span></div>' +
+      '<div class="tile hero"><span class="lbl">이번 달 전체 토큰</span><span class="val">' + fmtTok(totalTok) + ' tok</span>' +
+      '<span class="sub">✅ API ' + fmtTok(stats.month_tokens_api) + ' · 🖥️ 구독 ' + fmtTok(stats.month_tokens_sub) + '</span></div>' +
+      '<div class="tile"><span class="lbl">사용자</span><span class="val">' + stats.users + '</span>' +
+      '<span class="sub">이번 달 활성 ' + stats.active_users + '명</span></div>' +
+      '<div class="tile"><span class="lbl">비용 · ✅ API</span><span class="val">' + fmt(stats.month_cost_usd) + '</span>' +
+      '<span class="sub">연결된 키 ' + stats.keys + '개</span></div>' +
       '<div class="tile"><span class="lbl">서버</span><span class="val" style="color:var(--good-ink)">정상</span><span class="sub">매일 03시 자동 수집</span></div>';
     $("adminUserCnt").textContent = users.length + "명";
     var ago = function (iso) {
@@ -564,13 +564,16 @@
       return m < 1 ? "방금" : m < 60 ? m + "분 전" : m < 1440 ? Math.round(m / 60) + "시간 전" : Math.round(m / 1440) + "일 전";
     };
     $("adminUserTable").innerHTML =
-      '<tr><th>#</th><th>이메일</th><th>가입일</th><th>마지막 수집</th><th>키</th><th>이번 달</th><th></th></tr>' +
+      '<tr><th>#</th><th>사용자</th><th>가입일</th><th>마지막 수집</th><th>키</th><th>✅ API tok</th><th>🖥️ 구독 tok</th><th>비용</th><th></th></tr>' +
       users.map(function (u) {
         return '<tr><td>' + u.id + '</td>' +
-          '<td>' + esc(u.email) + (u.is_admin ? ' <span class="badge">관리자</span>' : '') + '</td>' +
+          '<td>' + esc(u.nickname || "") + ' <span style="color:var(--muted);font-size:0.74rem">' + esc(u.email) + '</span>' +
+          (u.is_admin ? ' <span class="badge">관리자</span>' : '') + '</td>' +
           '<td>' + u.created_at.slice(0, 10) + '</td>' +
           '<td>' + ago(u.last_sync_at) + '</td>' +
           '<td>' + u.keys + '</td>' +
+          '<td>' + fmtTok(u.month_tokens_api) + '</td>' +
+          '<td>' + fmtTok(u.month_tokens_sub) + '</td>' +
           '<td>' + fmt(u.month_cost_usd) + '</td>' +
           '<td>' + (u.is_admin ? '' : '<button class="btn ghost del" onclick="tokenbill.adminDelete(' + u.id + ', \'' + esc(u.email) + '\')">삭제</button>') + '</td></tr>';
       }).join("");

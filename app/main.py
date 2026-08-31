@@ -643,34 +643,51 @@ def leaderboard_public(request: Request, db: Session = Depends(get_db)):
 @app.get("/api/admin/stats")
 def admin_stats(admin: models.User = Depends(admin_user), db: Session = Depends(get_db)):
     month_start = date.today().replace(day=1)
-    by_provider = dict(db.query(
-        models.UsageDaily.provider, func.coalesce(func.sum(models.UsageDaily.cost_usd), 0.0),
-    ).filter(models.UsageDaily.day >= month_start).group_by(models.UsageDaily.provider).all())
+    tok = models.UsageDaily.input_tokens + models.UsageDaily.output_tokens
+    api_tok = case((models.UsageDaily.provider.in_(PROVIDERS), tok), else_=0)
+    sub_tok = case((~models.UsageDaily.provider.in_(PROVIDERS), tok), else_=0)
+    agg = db.query(
+        func.coalesce(func.sum(api_tok), 0),
+        func.coalesce(func.sum(sub_tok), 0),
+        func.coalesce(func.sum(models.UsageDaily.cost_usd), 0.0),
+        func.count(func.distinct(models.UsageDaily.user_id)),
+    ).filter(models.UsageDaily.day >= month_start).first()
     return {
         "users": db.query(func.count(models.User.id)).scalar(),
+        "active_users": int(agg[3]),
         "keys": db.query(func.count(models.ProviderKey.id)).scalar(),
-        "month_cost_usd": round(sum(by_provider.values()), 4),
-        "month_cost_by_provider": {p: round(c, 4) for p, c in by_provider.items()},
+        "month_tokens_api": int(agg[0]),
+        "month_tokens_sub": int(agg[1]),
+        "month_cost_usd": round(agg[2], 4),
     }
 
 
 @app.get("/api/admin/users")
 def admin_users(admin: models.User = Depends(admin_user), db: Session = Depends(get_db)):
     month_start = date.today().replace(day=1)
-    cost_by_user = dict(db.query(
-        models.UsageDaily.user_id, func.coalesce(func.sum(models.UsageDaily.cost_usd), 0.0),
-    ).filter(models.UsageDaily.day >= month_start).group_by(models.UsageDaily.user_id).all())
+    tok = models.UsageDaily.input_tokens + models.UsageDaily.output_tokens
+    api_tok = case((models.UsageDaily.provider.in_(PROVIDERS), tok), else_=0)
+    sub_tok = case((~models.UsageDaily.provider.in_(PROVIDERS), tok), else_=0)
+    usage_by_user = {uid: (int(a), int(s), float(c)) for uid, a, s, c in db.query(
+        models.UsageDaily.user_id,
+        func.coalesce(func.sum(api_tok), 0),
+        func.coalesce(func.sum(sub_tok), 0),
+        func.coalesce(func.sum(models.UsageDaily.cost_usd), 0.0),
+    ).filter(models.UsageDaily.day >= month_start).group_by(models.UsageDaily.user_id).all()}
     keys_by_user = dict(db.query(
         models.ProviderKey.user_id, func.count(models.ProviderKey.id),
     ).group_by(models.ProviderKey.user_id).all())
     return [{
         "id": u.id,
         "email": u.email,
+        "nickname": u.nickname,
         "is_admin": u.is_admin,
         "created_at": u.created_at.isoformat() + "Z",
         "last_sync_at": u.last_sync_at.isoformat() + "Z" if u.last_sync_at else None,
         "keys": keys_by_user.get(u.id, 0),
-        "month_cost_usd": round(cost_by_user.get(u.id, 0.0), 4),
+        "month_tokens_api": usage_by_user.get(u.id, (0, 0, 0.0))[0],
+        "month_tokens_sub": usage_by_user.get(u.id, (0, 0, 0.0))[1],
+        "month_cost_usd": round(usage_by_user.get(u.id, (0, 0, 0.0))[2], 4),
     } for u in db.query(models.User).order_by(models.User.id).all()]
 
 
