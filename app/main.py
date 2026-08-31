@@ -19,7 +19,6 @@ from . import models
 from .collector import cooldown_remaining_sec, sync_all_users, sync_user, MANUAL_COOLDOWN_MIN
 from .notify import alerts_available, send_email
 from .providers.collectors import detect_openai_write_scope, fetch_org_name
-from .providers.prices import estimate_cost
 from .db import get_db, init_db
 from .security import (create_token, current_user, decrypt_key, encrypt_key,
                        hash_password, mask_key, verify_password)
@@ -467,7 +466,8 @@ def usage_import(body: ImportIn, request: Request, db: Session = Depends(get_db)
         db.add(models.UsageDaily(
             user_id=user.id, key_id=None, day=d, provider=body.source,
             project_id=None, project_name=None, model=model,
-            cost_usd=round(estimate_cost(model, in_tok, out_tok), 4),
+            # 구독 사용량은 실제 청구 비용이 아니므로 $0 — 토큰·리더보드에만 합산
+            cost_usd=0.0,
             input_tokens=in_tok, output_tokens=out_tok,
         ))
     db.commit()
