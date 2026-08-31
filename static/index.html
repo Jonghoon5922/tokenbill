@@ -258,7 +258,7 @@
   <div class="cols">
     <div>
       <section class="card">
-        <h2>일별 사용량 <span class="cnt">최근 30일 · 프로바이더별</span>
+        <h2>일별 사용량 — ✅ API <span class="cnt">최근 30일</span>
           <span class="cur-toggle" role="group" aria-label="일별 보기 기준" style="margin-left:auto">
             <button id="dvCost" class="on">비용</button><button id="dvTok">토큰</button>
           </span>
@@ -268,21 +268,34 @@
         <p class="chart-note">막대에 마우스를 올리면 상세 내역이 표시됩니다.</p>
       </section>
       <section class="card">
-        <h2>모델별 사용량 <span class="cnt">이번 달</span>
+        <h2>일별 사용량 — 🖥️ 구독 <span class="cnt">최근 30일 · 토큰</span></h2>
+        <div class="legend" id="subLegend"></div>
+        <div id="subChart"></div>
+      </section>
+      <section class="card">
+        <h2>모델별 사용량 — ✅ API <span class="cnt">이번 달</span>
           <span class="cur-toggle" role="group" aria-label="모델별 보기 기준" style="margin-left:auto">
             <button id="mvCost" class="on">비용</button><button id="mvTok">토큰</button>
           </span>
         </h2>
         <div id="modelChart"></div>
       </section>
+      <section class="card">
+        <h2>모델별 사용량 — 🖥️ 구독 <span class="cnt">이번 달 · 토큰</span></h2>
+        <div id="subModelChart"></div>
+      </section>
     </div>
     <div>
       <section class="card">
-        <h2>연결된 프로바이더 <span class="cnt" id="provCnt"></span>
+        <h2>연결된 프로바이더 — ✅ API <span class="cnt" id="provCnt"></span>
           <button class="btn ghost" id="syncBtn" style="margin-left:auto">지금 갱신</button>
         </h2>
         <p class="chart-note" id="syncInfo" style="margin:-6px 0 10px"></p>
         <div id="provList"></div>
+      </section>
+      <section class="card">
+        <h2>구독 연동 — 🖥️ MCP <span class="cnt" id="subCnt"></span></h2>
+        <div id="subProvList"></div>
       </section>
       <section class="card">
         <h2>인사이트
@@ -293,7 +306,7 @@
       <section class="card">
         <h2>🏆 토큰 리더보드 <span class="cnt">이번 달</span>
           <span class="cur-toggle" role="group" aria-label="리더보드 트랙" style="margin-left:auto">
-            <button id="lbAll" class="on">전체</button><button id="lbApi">✅ API</button><button id="lbSub">🖥️ 구독</button>
+            <button id="lbApi" class="on">✅ API</button><button id="lbSub">🖥️ 구독</button>
           </span>
         </h2>
         <div id="lbBox"></div>
@@ -430,6 +443,20 @@
     "gemini":      { name: "Gemini CLI 🖥️",  color: "var(--s-google)" }
   };
   function provMeta(pid) { return PROVIDERS[pid] || { name: pid, color: "var(--accent)" }; }
+  var API_PROVIDERS = ["openai", "anthropic", "google"];
+  function isApiProv(pid) { return API_PROVIDERS.indexOf(pid) >= 0; }
+  var TIERS = [
+    [1e9, "🌌", "AGI 소환자"], [1e8, "🔥", "토큰 버너"], [1e7, "⚡", "컨텍스트 마스터"],
+    [1e6, "🔨", "프롬프트 장인"], [1e5, "📦", "토큰 수집가"], [0, "🌱", "프롬프트 입문"]
+  ];
+  function tierOf(tokens) {
+    for (var i = 0; i < TIERS.length; i++) {
+      if (tokens >= TIERS[i][0]) {
+        return { emoji: TIERS[i][1], name: TIERS[i][2],
+                 next: i > 0 ? { name: TIERS[i - 1][2], at: TIERS[i - 1][0] } : null };
+      }
+    }
+  }
   var $ = function (id) { return document.getElementById(id); };
   var token = null;
   try { token = localStorage.getItem("tokenbill-token"); } catch (e) {}
@@ -438,7 +465,7 @@
   var me = null, providers = [], daily = [], modelRows = [], breakdown = [], lb = null;
   var modelView = "cost";
   var dailyView = "cost";
-  var lbTrack = "all";  // all(구독 포함) | api(프로바이더 검증)
+  var lbTrack = "api";  // api(프로바이더 검증) | sub(구독)
   var expandedOrgs = {};  // key_id → true (프로젝트 드릴다운 펼침 상태)
 
   // ── API helper ──
@@ -580,7 +607,6 @@
   $("mvTok").addEventListener("click", function () { modelView = "tok"; render(); });
   $("dvCost").addEventListener("click", function () { dailyView = "cost"; render(); });
   $("dvTok").addEventListener("click", function () { dailyView = "tok"; render(); });
-  $("lbAll").addEventListener("click", function () { lbTrack = "all"; render(); });
   $("lbApi").addEventListener("click", function () { lbTrack = "api"; render(); });
   $("lbSub").addEventListener("click", function () { lbTrack = "sub"; render(); });
 
@@ -774,16 +800,22 @@
     $("alertTestBtn").classList.toggle("hidden", !me.alerts_available);
 
     var connected = providers.filter(function (p) { return p.connected; }).map(function (p) { return p.provider; });
-    // 차트·타일은 API 연동 + 구독 업로드 소스를 모두 포함
-    var active = connected.slice();
-    daily.forEach(function (r) { if (active.indexOf(r.provider) < 0) active.push(r.provider); });
+    // 투트랙: API(키 연동) / 구독(MCP 업로드) 분리 집계
+    var apiActive = connected.slice();
+    var subActive = [];
+    daily.forEach(function (r) {
+      var list = isApiProv(r.provider) ? apiActive : subActive;
+      if (list.indexOf(r.provider) < 0) list.push(r.provider);
+    });
+    var active = apiActive.concat(subActive);
     var map = dayMap();
     var mp = monthPrefix();
 
-    var monthTotal = 0, monthTok = 0;
+    var monthTotal = 0, monthTok = 0, monthTokApi = 0, monthTokSub = 0;
     Object.keys(map).forEach(function (date) {
       if (date.indexOf(mp) === 0) for (var pid in map[date]) {
         monthTotal += map[date][pid].cost; monthTok += map[date][pid].tok;
+        if (isApiProv(pid)) monthTokApi += map[date][pid].tok; else monthTokSub += map[date][pid].tok;
       }
     });
     var yesterday = sumRange(map, 1, 1);
@@ -795,7 +827,7 @@
 
     $("tTotal").textContent = active.length ? fmt(monthTotal) : "—";
     $("tTotalSub").textContent = active.length
-      ? "토큰 " + fmtTok(monthTok) + " · " + active.map(function (p) { return provMeta(p).name; }).join(" · ")
+      ? "✅ API " + fmtTok(monthTokApi) + " tok · 🖥️ 구독 " + fmtTok(monthTokSub) + " tok"
       : "프로바이더를 연결해 보세요";
     $("tYesterday").textContent = active.length ? fmt(yesterday) : "—";
     var diff = prior7 > 0 ? (yesterday - prior7) / prior7 : 0;
@@ -816,55 +848,60 @@
 
     renderSync(connected);
     renderProviders();
-    renderDaily(map, active);
+    renderSubProviders();
+    $("dvCost").className = dailyView === "cost" ? "on" : "";
+    $("dvTok").className = dailyView === "tok" ? "on" : "";
+    renderDaily(map, apiActive, "dailyChart", "dailyLegend", dailyView,
+      "Admin 키를 연결하면 일별 사용량이 표시됩니다.");
+    renderDaily(map, subActive, "subChart", "subLegend", "tok",
+      "마이페이지에서 MCP를 연동하면 구독 토큰이 표시됩니다.");
     renderModels();
-    renderInsights(active, yesterday, prior7, projected, monthTotal, map);
+    renderSubModels();
+    renderInsights(apiActive, yesterday, prior7, projected, monthTotal, map);
     renderLeaderboard();
   }
 
   function renderLeaderboard() {
     var el = $("lbBox");
     if (!lb) { el.innerHTML = ""; return; }
-    $("lbAll").className = lbTrack === "all" ? "on" : "";
     $("lbApi").className = lbTrack === "api" ? "on" : "";
     $("lbSub").className = lbTrack === "sub" ? "on" : "";
-    var m = lb.me, t = m.tier;
-    var nextTxt = t.next
-      ? "다음 티어 " + esc(t.next.name) + "까지 " + fmtTok(Math.max(0, t.next.at - m.tokens)) + " tok"
-      : "최고 티어 달성!";
-    var apiTxt = m.api_rank
-      ? "✅ API: " + fmtTok(m.api_tokens) + " tok · " + m.api_rank + "위/" + lb.total_api_users + "명"
-      : "✅ API: 미진입 (Admin 키 연동 시)";
-    var subTxt = m.sub_rank
-      ? "🖥️ 구독: " + fmtTok(m.sub_tokens) + " tok · " + m.sub_rank + "위/" + lb.total_sub_users + "명"
-      : "🖥️ 구독: 미진입 (MCP 연동 시)";
-    var html = '<div class="mytier"><span class="emj">' + t.emoji + '</span>' +
-      '<div><div class="tn">' + esc(t.name) + '</div>' +
-      '<div class="ts">이번 달 ' + fmtTok(m.tokens) + ' tok · ' + m.rank + '위 / ' + lb.total_users + '명 (상위 ' + m.percentile + '%)</div>' +
-      '<div class="ts">' + nextTxt + '</div>' +
-      '<div class="ts">' + apiTxt + ' · ' + subTxt + '</div></div></div>';
-    var board = lbTrack === "api" ? lb.top_api : lbTrack === "sub" ? lb.top_sub : lb.top;
+    var m = lb.me;
+    var isApi = lbTrack === "api";
+    var myTok = isApi ? m.api_tokens : m.sub_tokens;
+    var myRank = isApi ? m.api_rank : m.sub_rank;
+    var users = isApi ? lb.total_api_users : lb.total_sub_users;
+    var t = tierOf(myTok);
+    var html;
+    if (myRank) {
+      var nextTxt = t.next
+        ? "다음 티어 " + esc(t.next.name) + "까지 " + fmtTok(Math.max(0, t.next.at - myTok)) + " tok"
+        : "최고 티어 달성!";
+      html = '<div class="mytier"><span class="emj">' + t.emoji + '</span>' +
+        '<div><div class="tn">' + esc(t.name) + '</div>' +
+        '<div class="ts">이번 달 ' + fmtTok(myTok) + ' tok · ' + myRank + '위 / ' + users + '명 (상위 ' + Math.round(myRank / Math.max(users, 1) * 100) + '%)</div>' +
+        '<div class="ts">' + nextTxt + '</div></div></div>';
+    } else {
+      html = '<div class="mytier"><span class="emj">' + (isApi ? '✅' : '🖥️') + '</span>' +
+        '<div><div class="tn">아직 이 트랙 기록이 없어요</div>' +
+        '<div class="ts">' + (isApi ? 'Admin 키를 연동하면 API 트랙에 진입합니다.' : '마이페이지에서 MCP를 연동하면 구독 트랙에 진입합니다.') + '</div></div></div>';
+    }
+    var board = isApi ? lb.top_api : lb.top_sub;
     if (!board.length) {
-      html += lbTrack === "api"
-        ? '<p class="empty">아직 API 사용 기록이 없습니다 — Admin 키를 연동해 보세요.</p>'
-        : lbTrack === "sub"
-          ? '<p class="empty">아직 구독 사용 기록이 없습니다 — 마이페이지에서 MCP를 연동해 보세요.</p>'
-          : '<p class="empty">아직 이번 달 사용 기록이 없습니다. 첫 토큰을 태워보세요! 🔥</p>';
+      html += '<p class="empty">' + (isApi
+        ? '아직 API 사용 기록이 없습니다 — Admin 키를 연동해 보세요.'
+        : '아직 구독 사용 기록이 없습니다 — 마이페이지에서 MCP를 연동해 보세요.') + '</p>';
     } else {
       var medals = ["🥇", "🥈", "🥉"];
       html += board.map(function (b) {
-        var badge = lbTrack === "all" && b.has_sub ? ' <span title="구독 CLI 사용량 포함 (본인 PC 로그에서 자동 집계)">🖥️</span>' : '';
         return '<div class="lbrow' + (b.me ? ' me' : '') + '">' +
           '<span class="rk">' + (medals[b.rank - 1] || b.rank) + '</span>' +
-          '<span class="nm">' + (b.me ? '나 (' + esc(b.name) + ')' : esc(b.name)) + ' ' + b.tier.emoji + badge + '</span>' +
+          '<span class="nm">' + (b.me ? '나 (' + esc(b.name) + ')' : esc(b.name)) + ' ' + b.tier.emoji + '</span>' +
           '<span class="tk">' + fmtTok(b.tokens) + ' tok</span></div>';
       }).join("");
-      html += '<p class="chart-note" style="margin-top:8px">' +
-        (lbTrack === "api"
-          ? '프로바이더 API가 직접 집계한 검증된 수치끼리의 순위입니다.'
-          : lbTrack === "sub"
-            ? '구독 CLI(Claude Code·Codex·Gemini) 사용량끼리의 순위 — 본인 PC 로그에서 자동 집계됩니다.'
-            : '🖥️ = 구독 CLI 사용량 포함 · 방식별 순위는 ✅ API / 🖥️ 구독 탭') + '</p>';
+      html += '<p class="chart-note" style="margin-top:8px">' + (isApi
+        ? '프로바이더 API가 직접 집계한 검증된 수치끼리의 순위입니다.'
+        : '구독 CLI(Claude Code·Codex·Gemini) 사용량끼리의 순위 — 본인 PC 로그에서 자동 집계됩니다.') + '</p>';
     }
     el.innerHTML = html;
   }
@@ -947,11 +984,12 @@
       return '<div class="prov"><span class="dot" style="background:' + meta.color + ';opacity:0.35"></span>' +
         '<div class="nm" style="color:var(--muted)">' + meta.name + '</div>' +
         '<button class="btn" onclick="tokenbill.showKeyForm(\'' + p.provider + '\')">키 등록</button></div>' + keyform;
-    }).join("") + renderSubSources();
+    }).join("");
   }
 
-  // 구독 사용량(MCP 업로드) 소스 — key_id 없는 breakdown 행에서 도출
-  function renderSubSources() {
+  // 구독 연동(MCP 업로드) 카드 — key_id 없는 breakdown 행에서 도출
+  function renderSubProviders() {
+    var el = $("subProvList");
     var bySrc = {};
     breakdown.forEach(function (r) {
       if (r.key_id !== null) return;
@@ -959,7 +997,14 @@
       s.tokens += r.input_tokens + r.output_tokens;
       s.models.push({ model: r.model, tok: r.input_tokens + r.output_tokens });
     });
-    return Object.keys(bySrc).map(function (src) {
+    var srcs = Object.keys(bySrc);
+    $("subCnt").textContent = srcs.length ? srcs.length + "개 소스" : "";
+    if (!srcs.length) {
+      el.innerHTML = '<p class="empty" style="padding:10px 4px">Claude Code·Codex·Gemini CLI의 구독 토큰을 자동 수집합니다.<br>' +
+        '<button class="btn" style="margin-top:10px" onclick="tokenbill.openMy()">마이페이지에서 연동하기</button></p>';
+      return;
+    }
+    el.innerHTML = srcs.map(function (src) {
       var s = bySrc[src], meta = provMeta(src);
       var oid = "sub:" + src;
       var open = isOrgOpen(oid, false);
@@ -979,11 +1024,14 @@
     }).join("");
   }
 
-  function renderDaily(map, connected) {
-    var el = $("dailyChart"), lg = $("dailyLegend");
+  function renderDaily(map, connected, chartId, legendId, view, emptyMsg) {
+    var el = $(chartId), lg = $(legendId);
+    var dailyViewSaved = dailyView;
+    dailyView = view;  // val() 헬퍼가 참조
     if (!connected.length) {
-      el.innerHTML = '<p class="empty">프로바이더를 연결하면 일별 비용이 표시됩니다.</p>';
+      el.innerHTML = '<p class="empty">' + emptyMsg + '</p>';
       lg.innerHTML = "";
+      dailyView = dailyViewSaved;
       return;
     }
     lg.innerHTML = connected.map(function (pid) {
@@ -995,8 +1043,6 @@
       var d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
       days.push(iso(d));
     }
-    $("dvCost").className = dailyView === "cost" ? "on" : "";
-    $("dvTok").className = dailyView === "tok" ? "on" : "";
     var val = function (r) { return dailyView === "tok" ? r.tok : r.cost; };
     var max = 0;
     days.forEach(function (dt) {
@@ -1060,17 +1106,37 @@
       });
       r.addEventListener("mouseleave", function () { tip.style.display = "none"; });
     });
+    dailyView = dailyViewSaved;
+  }
+
+  function renderSubModels() {
+    var el = $("subModelChart");
+    var rows = modelRows.filter(function (r) { return !isApiProv(r.provider); });
+    if (!rows.length) {
+      el.innerHTML = '<p class="empty">MCP 연동 후 구독 모델별 사용량이 집계됩니다.</p>';
+      return;
+    }
+    var items = rows.map(function (r) { return { model: r.model, tok: r.input_tokens + r.output_tokens, color: provMeta(r.provider).color }; });
+    items.sort(function (a, b) { return b.tok - a.tok; });
+    var max = items[0].tok || 1;
+    el.innerHTML = items.slice(0, 9).map(function (it) {
+      var w = Math.max(2, (it.tok / max) * 100);
+      return '<div class="hbar-row"><span class="nm">' + esc(it.model) + '</span>' +
+        '<div class="hbar-track"><div class="hbar-fill" style="width:' + w + '%;background:' + it.color + '"></div></div>' +
+        '<span class="v">' + fmtTok(it.tok) + ' tok</span></div>';
+    }).join("");
   }
 
   function renderModels() {
     var el = $("modelChart");
     $("mvCost").className = modelView === "cost" ? "on" : "";
     $("mvTok").className = modelView === "tok" ? "on" : "";
-    if (!modelRows.length) {
-      el.innerHTML = '<p class="empty">연결 후 모델별 사용량이 집계됩니다.</p>';
+    var apiRows = modelRows.filter(function (r) { return isApiProv(r.provider); });
+    if (!apiRows.length) {
+      el.innerHTML = '<p class="empty">Admin 키 연결 후 모델별 사용량이 집계됩니다.</p>';
       return;
     }
-    var items = modelRows.map(function (r) {
+    var items = apiRows.map(function (r) {
       return { model: r.model, cost: r.cost_usd, inTok: r.input_tokens, outTok: r.output_tokens,
                color: provMeta(r.provider).color };
     });
