@@ -853,7 +853,7 @@
     } else {
       var medals = ["🥇", "🥈", "🥉"];
       html += board.map(function (b) {
-        var badge = lbTrack === "all" && b.has_sub ? ' <span title="구독(자기 신고) 사용량 포함">🖥️</span>' : '';
+        var badge = lbTrack === "all" && b.has_sub ? ' <span title="구독 CLI 사용량 포함 (본인 PC 로그에서 자동 집계)">🖥️</span>' : '';
         return '<div class="lbrow' + (b.me ? ' me' : '') + '">' +
           '<span class="rk">' + (medals[b.rank - 1] || b.rank) + '</span>' +
           '<span class="nm">' + (b.me ? '나 (' + esc(b.name) + ')' : esc(b.name)) + ' ' + b.tier.emoji + badge + '</span>' +
@@ -863,8 +863,8 @@
         (lbTrack === "api"
           ? '프로바이더 API가 직접 집계한 검증된 수치끼리의 순위입니다.'
           : lbTrack === "sub"
-            ? '구독 CLI(Claude Code·Codex·Gemini) 사용량끼리의 순위입니다 — 본인 PC 로그 기반 자기 신고 값.'
-            : '🖥️ = 구독(자기 신고) 포함 · 방식별 순위는 ✅ API / 🖥️ 구독 탭') + '</p>';
+            ? '구독 CLI(Claude Code·Codex·Gemini) 사용량끼리의 순위 — 본인 PC 로그에서 자동 집계됩니다.'
+            : '🖥️ = 구독 CLI 사용량 포함 · 방식별 순위는 ✅ API / 🖥️ 구독 탭') + '</p>';
     }
     el.innerHTML = html;
   }
