@@ -606,6 +606,16 @@ def usage_import(body: ImportIn, request: Request, db: Session = Depends(get_db)
     return {"ok": True, "rows": len(agg), "from": lo.isoformat(), "to": hi.isoformat()}
 
 
+@app.delete("/api/usage/subscription/{source}")
+def delete_subscription(source: str, user: models.User = Depends(current_user), db: Session = Depends(get_db)):
+    """구독 소스의 수집 데이터 삭제. MCP 등록이 남아 있으면 다음 실행 때 재업로드됨."""
+    if source not in IMPORT_SOURCES:
+        raise HTTPException(404, "알 수 없는 소스입니다")
+    n = db.query(models.UsageDaily).filter_by(user_id=user.id, provider=source).delete()
+    db.commit()
+    return {"ok": True, "deleted_rows": n}
+
+
 @app.get("/api/uploader/me")
 def uploader_me(request: Request, db: Session = Depends(get_db)):
     """업로더/MCP용 내 순위 요약 (업로드 토큰 인증)."""

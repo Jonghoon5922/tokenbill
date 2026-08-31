@@ -732,6 +732,12 @@
         .then(function () { toast("테스트 메일을 보냈습니다 — 받은편지함을 확인하세요"); })
         .catch(function (e) { toast(e.message); });
     },
+    subDelete: function (source, name) {
+      if (!confirm(name + "의 수집 데이터를 모두 삭제할까요?\n\n주의: PC에 MCP 등록이 남아 있으면 다음 CLI 실행 때 다시 업로드됩니다.\n완전히 끊으려면 ① 터미널에서 'claude mcp remove tokenbill' 실행 또는 ② 마이페이지에서 토큰 재발급(기존 업로더 차단) 후 삭제하세요.")) return;
+      api("/api/usage/subscription/" + source, { method: "DELETE" })
+        .then(function () { toast("삭제 완료"); return refreshAll(); })
+        .catch(function (e) { toast(e.message); });
+    },
     adminDelete: function (userId, email) {
       if (!confirm(email + " 계정과 모든 데이터를 삭제할까요?")) return;
       api("/api/admin/users/" + userId, { method: "DELETE" })
@@ -1089,7 +1095,8 @@
         '<div class="nm" style="cursor:pointer" onclick="tokenbill.toggleOrg(\'' + oid + '\', false)">' +
         '<span class="arrow" style="display:inline-block;width:14px;color:var(--muted);font-size:0.7rem">' + (open ? '▾' : '▸') + '</span>' + meta.name +
         '<span class="key">MCP 자동 업로드 · 구독</span></div>' +
-        '<div class="amt">' + fmtTok(s.tokens) + ' tok<span class="cap">이번 달</span></div></div>';
+        '<div class="amt">' + fmtTok(s.tokens) + ' tok<span class="cap">이번 달</span></div>' +
+        '<button class="btn ghost" onclick="tokenbill.subDelete(\'' + src + '\', \'' + provMeta(src).name.replace(/'/g, "") + '\')">삭제</button></div>';
       if (open) {
         html += '<div class="projbox flat">' + s.models.map(function (m) {
           return '<div class="mline"><span class="mnm">' + esc(m.model) + '</span>' +
