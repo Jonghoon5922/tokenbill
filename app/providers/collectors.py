@@ -192,7 +192,8 @@ def _anthropic_daily_costs(client: httpx.Client, headers: dict, start: date, end
             for bucket in data.get("data", []):
                 d = datetime.fromisoformat(bucket["starting_at"].replace("Z", "+00:00")).date()
                 for item in bucket.get("results", []):
-                    out[d] = out.get(d, 0.0) + float(item.get("amount", 0) or 0)
+                    # cost_report의 amount는 센트 단위 → 달러로 환산
+                    out[d] = out.get(d, 0.0) + float(item.get("amount", 0) or 0) / 100.0
             if data.get("has_more") and data.get("next_page"):
                 params["page"] = data["next_page"]
             else:
