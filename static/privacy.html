@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>개인정보처리방침 — Tokenbill</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<style>
+  body { font-family: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+         max-width: 720px; margin: 0 auto; padding: 40px 20px 80px; line-height: 1.7; color: #0b0b0b; background: #f9f9f7; }
+  h1 { font-size: 1.5rem; } h2 { font-size: 1.05rem; margin-top: 28px; }
+  p, li { font-size: 0.92rem; color: #333; }
+  a { color: #1c5cab; }
+</style>
+</head>
+<body>
+<h1>개인정보처리방침</h1>
+<p>시행일: 2026년 8월 31일</p>
+
+<h2>1. 수집하는 정보</h2>
+<ul>
+  <li><b>계정 정보</b>: 이메일 주소, 별명. 구글 로그인 시 구글 계정의 이메일과 이름을 받습니다.</li>
+  <li><b>프로바이더 API 키</b>: 사용량 조회를 위해 사용자가 직접 등록한 OpenAI·Anthropic 등의 Admin API 키.</li>
+  <li><b>사용량 데이터</b>: 위 키로 조회한 일자·프로젝트·모델별 토큰 수와 비용 요약.</li>
+</ul>
+
+<h2>2. 이용 목적</h2>
+<p>AI API 비용 대시보드 제공(비용·토큰 집계, 프로젝트/모델별 분석), 예산 알림 이메일 발송,
+토큰 리더보드 표시(별명·티어·토큰량만 노출)에 사용합니다. 그 외 목적으로 사용하거나 제3자에게 제공하지 않습니다.</p>
+
+<h2>3. API 키의 보호</h2>
+<p>등록된 API 키는 서버에서 암호화(Fernet)되어 저장되며, 화면에는 마스킹된 형태로만 표시됩니다.
+키는 사용량 조회 API 호출에만 사용되며, 사용자가 연결을 해제하면 키와 수집된 사용량 데이터가 즉시 삭제됩니다.</p>
+
+<h2>4. 보관 및 파기</h2>
+<p>계정 삭제 또는 키 연결 해제 시 관련 데이터를 삭제합니다. 서버 장애 대비 백업은 최대 14일간 보관 후 자동 삭제됩니다.</p>
+
+<h2>5. 문의</h2>
+<p>개인정보 관련 문의: <a href="mailto:jackalope5922@gmail.com">jackalope5922@gmail.com</a></p>
+
+<p style="margin-top:40px"><a href="/">← Tokenbill로 돌아가기</a></p>
+</body>
+</html>

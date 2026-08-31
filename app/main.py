@@ -488,6 +488,16 @@ def index():
     return FileResponse("static/index.html", headers={"Cache-Control": "no-cache"})
 
 
+@app.get("/privacy", include_in_schema=False)
+def privacy():
+    return FileResponse("static/privacy.html")
+
+
+@app.get("/terms", include_in_schema=False)
+def terms():
+    return FileResponse("static/terms.html")
+
+
 # ── 스케줄러: 매일 1회 자동 수집 (03:00 KST = 18:00 UTC) ────
 scheduler = BackgroundScheduler(timezone="UTC")
 scheduler.add_job(sync_all_users, "cron", hour=18, minute=0)
