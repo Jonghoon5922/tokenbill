@@ -230,6 +230,7 @@
       <input type="number" id="budget" min="0" step="10">
       <button class="btn ghost" onclick="tokenbill.openMy()">마이페이지</button>
       <button class="btn ghost" onclick="tokenbill.openGuide()">가이드</button>
+      <button class="btn ghost" onclick="tokenbill.openFb()">피드백</button>
       <button class="btn ghost hidden" id="adminBtn">관리자</button>
       <button class="btn ghost" id="logoutBtn">로그아웃</button>
     </div>
@@ -433,7 +434,11 @@
       하나만 등록해도 PC의 세 CLI 기록을 전부 수집하며, AI에게 "내 토큰 순위 알려줘"라고 물으면 순위를 답해줍니다.</p>
       <p>토큰이 유출된 것 같으면 마이페이지에서 <b>재발급</b>하세요 (이전 토큰 즉시 무효).
       구독 사용량은 본인 PC 로그 기반이라 프로바이더 표시에 🖥️가 붙고, 비용은 $0(정액 구독)으로 집계됩니다.</p>
-      <h3>7. 키 보안</h3>
+      <h3>7. 문제가 있거나 아이디어가 있나요?</h3>
+      <p>헤더의 <b>피드백</b> 버튼(또는 하단 "버그 신고·기능 제안")으로 알려주세요 —
+      <a href="#" class="guide-link" onclick="tokenbill.closeGuide();tokenbill.openFb();return false">지금 신고하기</a>.
+      접수 내용은 공개 이슈 목록에 등록되어 처리 현황을 확인할 수 있습니다.</p>
+      <h3>8. 키 보안</h3>
       <p>등록한 API 키는 서버에서 암호화되어 저장되며 화면에는 마스킹된 형태로만 표시됩니다.
       해제하면 키와 수집된 데이터가 함께 삭제됩니다.</p>
     </div>
@@ -678,7 +683,11 @@
     openGuide: function () { $("guideModal").classList.remove("hidden"); },
     closeGuide: function () { $("guideModal").classList.add("hidden"); },
     openFb: function (ev) {
-      if (!me || !me.feedback_available) return true;  // 미설정 시 GitHub 링크로 이동
+      if (!me || !me.feedback_available) {
+        if (ev) return true;  // 푸터 링크는 GitHub으로 기본 이동
+        window.open("https://github.com/Jonghoon5922/tokenbill/issues", "_blank", "noopener");
+        return false;
+      }
       if (ev) ev.preventDefault();
       $("fbModal").classList.remove("hidden");
       return false;
