@@ -974,11 +974,14 @@
         var rec = map[dt] || {};
         var lines = ['<strong>' + dt + '</strong>'], total = 0, tok = 0;
         connected.forEach(function (pid) {
-          var v = rec[pid] ? rec[pid].cost : 0; total += v;
-          tok += rec[pid] ? rec[pid].tok : 0;
-          if (v > 0) lines.push(provMeta(pid).name + " " + fmt(v));
+          var c = rec[pid] ? rec[pid].cost : 0;
+          var t = rec[pid] ? rec[pid].tok : 0;
+          total += c; tok += t;
+          if (c > 0 || t > 0) {
+            lines.push(provMeta(pid).name + " — " + fmtTok(t) + " tok" + (c > 0 ? " · " + fmt(c) : ""));
+          }
         });
-        lines.push("합계 " + fmt(total) + " · " + fmtTok(tok) + " tok");
+        lines.push("<strong>합계 " + fmtTok(tok) + " tok · " + fmt(total) + "</strong>");
         tip.innerHTML = lines.join("<br>");
         tip.style.display = "block";
         tip.style.left = Math.min(ev.clientX + 14, window.innerWidth - 180) + "px";
