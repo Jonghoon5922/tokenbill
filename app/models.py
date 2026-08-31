@@ -39,6 +39,7 @@ class ProviderKey(Base):
     key_masked: Mapped[str] = mapped_column(String(64))        # 표시용 (sk-…abcd)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_status: Mapped[str] = mapped_column(String(255), default="pending")  # ok | error: … | pending
+    warning: Mapped[str | None] = mapped_column(String(255), nullable=True)   # 권한 과다 등 지속 경고
 
     user: Mapped["User"] = relationship(back_populates="keys")
     __table_args__ = (UniqueConstraint("user_id", "provider", "label", name="uq_user_provider_label"),)

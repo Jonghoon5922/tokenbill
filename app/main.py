@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from . import models
 from .collector import cooldown_remaining_sec, sync_all_users, sync_user, MANUAL_COOLDOWN_MIN
 from .notify import alerts_available, send_email
-from .providers.collectors import fetch_org_name
+from .providers.collectors import detect_openai_write_scope, fetch_org_name
 from .db import get_db, init_db
 from .security import (create_token, current_user, decrypt_key, encrypt_key,
                        hash_password, mask_key, verify_password)
@@ -223,6 +223,7 @@ def list_providers(user: models.User = Depends(current_user), db: Session = Depe
             "label": k.label,
             "key_masked": k.key_masked,
             "status": k.last_status,
+            "warning": k.warning,
             "month_cost_usd": round(cost_by_key.get(k.id, 0.0), 2),
         } for k in keys]
         out.append({
@@ -258,9 +259,14 @@ def add_provider(body: KeyIn, user: models.User = Depends(current_user), db: Ses
         while label in existing_labels:
             label = f"{base} {n}"
             n += 1
+    # OpenAI 키의 쓰기 권한 감지 — 과다 권한이면 지속 경고 표시 (등록은 허용)
+    warning = None
+    if body.provider == "openai" and detect_openai_write_scope(body.api_key):
+        warning = "전체 권한 키입니다 — Read only Admin 키로 교체를 권장합니다"
     key = models.ProviderKey(
         user_id=user.id, provider=body.provider, label=label,
         key_encrypted=encrypt_key(body.api_key), key_masked=mask_key(body.api_key),
+        warning=warning,
     )
     db.add(key)
     db.commit()

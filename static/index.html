@@ -80,6 +80,8 @@
   .prov .nm { font-weight: 600; font-size: 0.92rem; flex: 1; min-width: 0; }
   .prov .nm .key { display: block; font-size: 0.72rem; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
   .prov .nm .err { display: block; font-size: 0.72rem; font-weight: 500; color: var(--critical-ink); }
+  .prov .nm .warn { display: block; font-size: 0.72rem; font-weight: 500; color: var(--warn-ink); }
+  .keynote { flex-basis: 100%; font-size: 0.72rem; color: var(--muted); }
   .prov .amt { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .prov .amt .cap { display: block; font-size: 0.7rem; font-weight: 400; color: var(--muted); text-align: right; }
   .btn { padding: 7px 14px; border-radius: 7px; border: none; cursor: pointer; background: var(--accent); color: #fff; font: inherit; font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
@@ -766,7 +768,8 @@
       var meta = PROVIDERS[p.provider];
       var keyform = '<div class="keyform hidden" id="form-' + p.provider + '">' +
         '<input type="password" id="key-' + p.provider + '" placeholder="' + meta.keyPrefix + '… 또는 demo" aria-label="' + meta.name + ' API 키">' +
-        '<button class="btn" id="cbtn-' + p.provider + '" onclick="tokenbill.connect(\'' + p.provider + '\')">연결</button></div>';
+        '<button class="btn" id="cbtn-' + p.provider + '" onclick="tokenbill.connect(\'' + p.provider + '\')">연결</button>' +
+        (p.provider === "openai" ? '<span class="keynote">🔒 Read only 권한의 Admin 키를 권장합니다</span>' : '') + '</div>';
       function renderProjects(keyId, flat) {
         var cls = 'projbox' + (flat ? ' flat' : '');
         var projs = projectsOfKey(keyId);
@@ -791,7 +794,8 @@
         return '<div class="prov"><span class="dot" style="background:' + meta.color + '"></span>' +
           '<div class="nm" title="' + esc(k1.key_masked || "") + '" style="cursor:pointer" onclick="tokenbill.toggleOrg(' + k1.id + ', true)">' +
           '<span class="arrow" style="display:inline-block;width:14px;color:var(--muted);font-size:0.7rem">' + (open1 ? '▾' : '▸') + '</span>' + meta.name +
-          (err1 ? '<span class="err">' + esc(err1) + '</span>' : '') + '</div>' +
+          (err1 ? '<span class="err">' + esc(err1) + '</span>' : '') +
+          (k1.warning ? '<span class="warn">⚠️ ' + esc(k1.warning) + '</span>' : '') + '</div>' +
           '<div class="amt">' + fmt(p.month_cost_usd) + '<span class="cap">이번 달</span></div>' +
           '<button class="btn ghost addorg" onclick="tokenbill.showKeyForm(\'' + p.provider + '\')" aria-label="' + meta.name + ' 조직 추가" title="조직 추가">+</button>' +
           '<button class="btn ghost" onclick="tokenbill.disconnect(' + k1.id + ')">해제</button></div>' +
@@ -808,7 +812,8 @@
           var html = '<div class="prov org">' +
             '<div class="nm" title="' + esc(k.key_masked || "") + '" onclick="tokenbill.toggleOrg(' + k.id + ', false)">' +
             '<span class="arrow">' + (open ? '▾' : '▸') + '</span>' + esc(k.label) +
-            (err ? '<span class="err">' + esc(err) + '</span>' : '') + '</div>' +
+            (err ? '<span class="err">' + esc(err) + '</span>' : '') +
+            (k.warning ? '<span class="warn">⚠️ ' + esc(k.warning) + '</span>' : '') + '</div>' +
             '<div class="amt">' + fmt(k.month_cost_usd) + '</div>' +
             '<button class="btn ghost" onclick="tokenbill.disconnect(' + k.id + ')">해제</button></div>';
           if (open) html += renderProjects(k.id, false);

@@ -283,6 +283,31 @@ COLLECTORS = {
 }
 
 
+def detect_openai_write_scope(api_key: str) -> bool | None:
+    """OpenAI 키의 쓰기(management) 권한 보유 여부를 감지한다.
+
+    이름이 없는 무효 본문으로 프로젝트 생성을 시도하면 아무것도 생성되지 않으면서
+    권한만 판별된다: 403 → 쓰기 권한 없음(Read only), 400 → 쓰기 권한 있음.
+    판별 불가(네트워크 오류 등)면 None.
+    """
+    if api_key.lower().startswith("demo"):
+        return None
+    try:
+        with httpx.Client(timeout=10) as client:
+            r = client.post(
+                "https://api.openai.com/v1/organization/projects",
+                json={},  # name 누락 → 유효성 검사에서 반드시 실패 (생성되지 않음)
+                headers={"Authorization": f"Bearer {api_key}", **UA},
+            )
+            if r.status_code == 403:
+                return False
+            if r.status_code == 400:
+                return True
+    except Exception:
+        pass
+    return None
+
+
 def fetch_org_name(provider: str, api_key: str) -> str | None:
     """키가 속한 조직 이름 조회 (등록 시 라벨 자동 결정용). 실패하면 None."""
     if api_key.lower().startswith("demo"):

@@ -38,6 +38,8 @@ def init_db():
                 conn.exec_driver_sql("ALTER TABLE users ADD COLUMN alert_month VARCHAR(7)")
                 conn.exec_driver_sql("ALTER TABLE users ADD COLUMN alert_level INTEGER NOT NULL DEFAULT 0")
             pk_cols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(provider_keys)")]
+            if pk_cols and "label" in pk_cols and "warning" not in pk_cols:
+                conn.exec_driver_sql("ALTER TABLE provider_keys ADD COLUMN warning VARCHAR(255)")
             if pk_cols and "label" not in pk_cols:
                 conn.exec_driver_sql("ALTER TABLE provider_keys RENAME TO provider_keys_old")
                 # SQLite는 rename 후에도 인덱스 이름이 유지되어 create_all과 충돌 → 미리 제거
