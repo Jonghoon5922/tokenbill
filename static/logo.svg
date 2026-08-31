@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 320" role="img" aria-label="Tokenbill">
+  <!-- 마크 -->
+  <g transform="translate(16,16) scale(0.5625)">
+    <rect x="16" y="16" width="480" height="480" rx="112" fill="#2a78d6"/>
+    <rect x="118" y="312" width="70" height="102" rx="18" fill="#ffffff" opacity="0.85"/>
+    <rect x="221" y="252" width="70" height="162" rx="18" fill="#ffffff" opacity="0.92"/>
+    <rect x="324" y="176" width="70" height="238" rx="18" fill="#ffffff"/>
+    <path d="M359 76 C 372 96, 396 108, 396 136 C 396 160, 378 176, 359 176
+             C 340 176, 322 160, 322 136 C 322 122, 330 112, 337 104
+             C 336 116, 342 124, 350 126 C 344 108, 348 90, 359 76 Z" fill="#ffb020"/>
+  </g>
+  <!-- 워드마크 -->
+  <text x="352" y="212" font-family="'IBM Plex Sans KR','Malgun Gothic',system-ui,sans-serif"
+        font-size="150" font-weight="700" letter-spacing="-3">
+    <tspan fill="#0b0b0b">Token</tspan><tspan fill="#2a78d6">bill</tspan>
+  </text>
+</svg>
