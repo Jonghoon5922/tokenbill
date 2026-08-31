@@ -399,43 +399,51 @@ def _month_token_rows(db: Session):
 
 
 def _boards(db: Session):
+    """트랙별 순위: all(전체) / api(프로바이더 검증) / sub(구독 자기신고)."""
     rows = _month_token_rows(db)
     names = {u.id: (u.nickname or _mask_email(u.email)) for u in db.query(models.User).all()}
+    def metric(key, t, a):
+        return t if key == "all" else a if key == "api" else t - a
     def build(key):
         ordered = sorted(((uid, int(t), int(a)) for uid, t, a in rows),
-                         key=lambda r: r[1] if key == "all" else r[2], reverse=True)
+                         key=lambda r: metric(key, r[1], r[2]), reverse=True)
         out = []
-        for i, (uid, t, a) in enumerate(ordered):
-            tokens = t if key == "all" else a
-            if key == "api" and tokens <= 0:
+        for uid, t, a in ordered:
+            tokens = metric(key, t, a)
+            if key != "all" and tokens <= 0:
                 continue
             out.append({"rank": len(out) + 1, "uid": uid, "name": names.get(uid, "?"),
                         "tokens": tokens, "tier": _tier(tokens), "has_sub": t > a})
         return out
-    return build("all"), build("api")
+    return build("all"), build("api"), build("sub")
 
 
 @app.get("/api/leaderboard")
 def leaderboard(user: models.User = Depends(current_user), db: Session = Depends(get_db)):
     """이번 달 토큰 순위 — 전체(구독 포함)와 검증(API만) 투 트랙."""
-    board_all, board_api = _boards(db)
+    board_all, board_api, board_sub = _boards(db)
     def pack(board):
         return [{k: v for k, v in b.items() if k != "uid"} | {"me": b["uid"] == user.id}
                 for b in board[:10]]
-    mine = next((b for b in board_all if b["uid"] == user.id), None)
-    mine_api = next((b for b in board_api if b["uid"] == user.id), None)
+    def my(board):
+        return next((b for b in board if b["uid"] == user.id), None)
+    mine, mine_api, mine_sub = my(board_all), my(board_api), my(board_sub)
     my_tokens = mine["tokens"] if mine else 0
     my_rank = mine["rank"] if mine else len(board_all) + 1
     total = max(len(board_all), 1)
     return {
         "top": pack(board_all),
         "top_api": pack(board_api),
+        "top_sub": pack(board_sub),
         "me": {"rank": my_rank, "tokens": my_tokens, "tier": _tier(my_tokens),
                "percentile": round(my_rank / total * 100),
                "api_rank": mine_api["rank"] if mine_api else None,
-               "api_tokens": mine_api["tokens"] if mine_api else 0},
+               "api_tokens": mine_api["tokens"] if mine_api else 0,
+               "sub_rank": mine_sub["rank"] if mine_sub else None,
+               "sub_tokens": mine_sub["tokens"] if mine_sub else 0},
         "total_users": len(board_all),
         "total_api_users": len(board_api),
+        "total_sub_users": len(board_sub),
     }
 
 
@@ -562,7 +570,7 @@ def uploader_me(request: Request, db: Session = Depends(get_db)):
 def leaderboard_public(request: Request, db: Session = Depends(get_db)):
     """로그인 없이 볼 수 있는 리더보드 — 별명·티어·토큰량만 노출."""
     rate_limit(request, "pub-lb", 30, 60)
-    board_all, _ = _boards(db)
+    board_all, _, _ = _boards(db)
     return {
         "top": [{k: v for k, v in b.items() if k != "uid"} for b in board_all[:10]],
         "total_users": db.query(func.count(models.User.id)).scalar(),

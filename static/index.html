@@ -293,7 +293,7 @@
       <section class="card">
         <h2>🏆 토큰 리더보드 <span class="cnt">이번 달</span>
           <span class="cur-toggle" role="group" aria-label="리더보드 트랙" style="margin-left:auto">
-            <button id="lbAll" class="on">전체</button><button id="lbApi">✅ 검증</button>
+            <button id="lbAll" class="on">전체</button><button id="lbApi">✅ API</button><button id="lbSub">🖥️ 구독</button>
           </span>
         </h2>
         <div id="lbBox"></div>
@@ -582,6 +582,7 @@
   $("dvTok").addEventListener("click", function () { dailyView = "tok"; render(); });
   $("lbAll").addEventListener("click", function () { lbTrack = "all"; render(); });
   $("lbApi").addEventListener("click", function () { lbTrack = "api"; render(); });
+  $("lbSub").addEventListener("click", function () { lbTrack = "sub"; render(); });
 
   function syncErrors(sync) {
     return (sync || []).filter(function (s) { return !s.ok; }).map(function (s) {
@@ -826,23 +827,29 @@
     if (!lb) { el.innerHTML = ""; return; }
     $("lbAll").className = lbTrack === "all" ? "on" : "";
     $("lbApi").className = lbTrack === "api" ? "on" : "";
+    $("lbSub").className = lbTrack === "sub" ? "on" : "";
     var m = lb.me, t = m.tier;
     var nextTxt = t.next
       ? "다음 티어 " + esc(t.next.name) + "까지 " + fmtTok(Math.max(0, t.next.at - m.tokens)) + " tok"
       : "최고 티어 달성!";
     var apiTxt = m.api_rank
-      ? "✅ 검증 트랙: " + fmtTok(m.api_tokens) + " tok · " + m.api_rank + "위 / " + lb.total_api_users + "명"
-      : "✅ 검증 트랙: API 연동 시 진입 (프로바이더가 보증하는 수치)";
+      ? "✅ API: " + fmtTok(m.api_tokens) + " tok · " + m.api_rank + "위/" + lb.total_api_users + "명"
+      : "✅ API: 미진입 (Admin 키 연동 시)";
+    var subTxt = m.sub_rank
+      ? "🖥️ 구독: " + fmtTok(m.sub_tokens) + " tok · " + m.sub_rank + "위/" + lb.total_sub_users + "명"
+      : "🖥️ 구독: 미진입 (MCP 연동 시)";
     var html = '<div class="mytier"><span class="emj">' + t.emoji + '</span>' +
       '<div><div class="tn">' + esc(t.name) + '</div>' +
       '<div class="ts">이번 달 ' + fmtTok(m.tokens) + ' tok · ' + m.rank + '위 / ' + lb.total_users + '명 (상위 ' + m.percentile + '%)</div>' +
       '<div class="ts">' + nextTxt + '</div>' +
-      '<div class="ts">' + apiTxt + '</div></div></div>';
-    var board = lbTrack === "api" ? lb.top_api : lb.top;
+      '<div class="ts">' + apiTxt + ' · ' + subTxt + '</div></div></div>';
+    var board = lbTrack === "api" ? lb.top_api : lbTrack === "sub" ? lb.top_sub : lb.top;
     if (!board.length) {
       html += lbTrack === "api"
-        ? '<p class="empty">아직 검증(API) 사용 기록이 없습니다 — Admin 키를 연동해 보세요.</p>'
-        : '<p class="empty">아직 이번 달 사용 기록이 없습니다. 첫 토큰을 태워보세요! 🔥</p>';
+        ? '<p class="empty">아직 API 사용 기록이 없습니다 — Admin 키를 연동해 보세요.</p>'
+        : lbTrack === "sub"
+          ? '<p class="empty">아직 구독 사용 기록이 없습니다 — 마이페이지에서 MCP를 연동해 보세요.</p>'
+          : '<p class="empty">아직 이번 달 사용 기록이 없습니다. 첫 토큰을 태워보세요! 🔥</p>';
     } else {
       var medals = ["🥇", "🥈", "🥉"];
       html += board.map(function (b) {
@@ -854,8 +861,10 @@
       }).join("");
       html += '<p class="chart-note" style="margin-top:8px">' +
         (lbTrack === "api"
-          ? '프로바이더 API가 직접 집계한 검증된 수치만 반영됩니다.'
-          : '🖥️ = 구독 CLI(자기 신고) 사용량 포함 · 검증된 수치만 보려면 ✅ 검증 탭') + '</p>';
+          ? '프로바이더 API가 직접 집계한 검증된 수치끼리의 순위입니다.'
+          : lbTrack === "sub"
+            ? '구독 CLI(Claude Code·Codex·Gemini) 사용량끼리의 순위입니다 — 본인 PC 로그 기반 자기 신고 값.'
+            : '🖥️ = 구독(자기 신고) 포함 · 방식별 순위는 ✅ API / 🖥️ 구독 탭') + '</p>';
     }
     el.innerHTML = html;
   }
