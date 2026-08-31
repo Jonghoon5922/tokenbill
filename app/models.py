@@ -20,6 +20,7 @@ class User(Base):
     currency: Mapped[str] = mapped_column(String(3), default="USD")
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     nickname: Mapped[str | None] = mapped_column(String(32), nullable=True)  # 리더보드 표시 이름
+    upload_token: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)  # 구독 사용량 업로더 인증
     # 예산 알림 (이메일)
     alert_month: Mapped[str | None] = mapped_column(String(7), nullable=True)   # 알림 이력 기준 달 (YYYY-MM)
     alert_level: Mapped[int] = mapped_column(Integer, default=0)                # 0=없음 1=80% 2=100% 발송됨

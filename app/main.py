@@ -19,6 +19,7 @@ from . import models
 from .collector import cooldown_remaining_sec, sync_all_users, sync_user, MANUAL_COOLDOWN_MIN
 from .notify import alerts_available, send_email
 from .providers.collectors import detect_openai_write_scope, fetch_org_name
+from .providers.prices import estimate_cost
 from .db import get_db, init_db
 from .security import (create_token, current_user, decrypt_key, encrypt_key,
                        hash_password, mask_key, verify_password)
@@ -173,6 +174,7 @@ def me(user: models.User = Depends(current_user)):
         "cooldown_sec": cooldown_remaining_sec(user),
         "cooldown_min": MANUAL_COOLDOWN_MIN,
         "alerts_available": alerts_available(),
+        "upload_token": user.upload_token,
     }
 
 
@@ -404,6 +406,94 @@ def leaderboard(user: models.User = Depends(current_user), db: Session = Depends
                "percentile": round(my_rank / total * 100)},
         "total_users": len(board),
     }
+
+
+# ── 구독 사용량 업로더 (MCP) ────────────────────────────────
+IMPORT_SOURCES = {"claude-code": "Claude Code", "codex": "Codex CLI", "gemini": "Gemini CLI"}
+
+
+class ImportRow(BaseModel):
+    day: date
+    model: str = Field(min_length=1, max_length=128)
+    input_tokens: int = Field(ge=0, le=10**12)
+    output_tokens: int = Field(ge=0, le=10**12)
+
+
+class ImportIn(BaseModel):
+    source: str = Field(pattern="^(claude-code|codex|gemini)$")
+    rows: list[ImportRow] = Field(max_length=2000)
+
+
+def _uploader_user(request: Request, db: Session) -> models.User:
+    token = request.headers.get("x-upload-token", "")
+    user = db.query(models.User).filter_by(upload_token=token).first() if token else None
+    if user is None:
+        raise HTTPException(401, "업로드 토큰이 유효하지 않습니다 — 마이페이지에서 발급하세요")
+    return user
+
+
+@app.post("/api/uploader/token")
+def uploader_token(user: models.User = Depends(current_user), db: Session = Depends(get_db)):
+    """업로드 토큰 발급/재발급 (재발급 시 이전 토큰은 무효)."""
+    user.upload_token = "tbu_" + secrets.token_urlsafe(24)
+    db.commit()
+    return {"upload_token": user.upload_token}
+
+
+@app.post("/api/usage/import")
+def usage_import(body: ImportIn, request: Request, db: Session = Depends(get_db)):
+    """구독 사용량 업로드 — 해당 소스·기간의 기존 행을 교체(멱등)."""
+    rate_limit(request, "import", 60, 3600)
+    user = _uploader_user(request, db)
+    today = date.today()
+    # (day, model)로 합산 + 미래 날짜 제외
+    agg: dict[tuple, list[int]] = {}
+    for r in body.rows:
+        if r.day > today:
+            continue
+        k = (r.day, r.model[:128])
+        a = agg.setdefault(k, [0, 0])
+        a[0] += r.input_tokens
+        a[1] += r.output_tokens
+    if not agg:
+        return {"ok": True, "rows": 0}
+    lo, hi = min(k[0] for k in agg), max(k[0] for k in agg)
+    db.query(models.UsageDaily).filter(
+        models.UsageDaily.user_id == user.id,
+        models.UsageDaily.provider == body.source,
+        models.UsageDaily.day >= lo, models.UsageDaily.day <= hi,
+    ).delete()
+    for (d, model), (in_tok, out_tok) in agg.items():
+        db.add(models.UsageDaily(
+            user_id=user.id, key_id=None, day=d, provider=body.source,
+            project_id=None, project_name=None, model=model,
+            cost_usd=round(estimate_cost(model, in_tok, out_tok), 4),
+            input_tokens=in_tok, output_tokens=out_tok,
+        ))
+    db.commit()
+    return {"ok": True, "rows": len(agg), "from": lo.isoformat(), "to": hi.isoformat()}
+
+
+@app.get("/api/uploader/me")
+def uploader_me(request: Request, db: Session = Depends(get_db)):
+    """업로더/MCP용 내 순위 요약 (업로드 토큰 인증)."""
+    rate_limit(request, "import", 60, 3600)
+    user = _uploader_user(request, db)
+    month_start = date.today().replace(day=1)
+    rows = db.query(
+        models.UsageDaily.user_id,
+        func.coalesce(func.sum(models.UsageDaily.input_tokens + models.UsageDaily.output_tokens), 0),
+    ).filter(models.UsageDaily.day >= month_start).group_by(models.UsageDaily.user_id) \
+     .order_by(func.sum(models.UsageDaily.input_tokens + models.UsageDaily.output_tokens).desc()).all()
+    my_tokens, my_rank = 0, len(rows) + 1
+    for i, (uid, t) in enumerate(rows):
+        if uid == user.id:
+            my_tokens, my_rank = int(t), i + 1
+            break
+    my_cost = db.query(func.coalesce(func.sum(models.UsageDaily.cost_usd), 0.0)).filter(
+        models.UsageDaily.user_id == user.id, models.UsageDaily.day >= month_start).scalar()
+    return {"nickname": user.nickname, "rank": my_rank, "total_users": max(len(rows), 1),
+            "tokens": my_tokens, "cost_usd": round(my_cost, 4), "tier": _tier(my_tokens)}
 
 
 @app.get("/api/leaderboard/public")

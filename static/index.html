@@ -20,6 +20,7 @@
     --muted: #898781; --grid: #e1e0d9; --baseline: #c3c2b7; --border: rgba(11,11,11,0.10);
     --accent: #2a78d6; --accent-ink: #1c5cab;
     --s-openai: #1baf7a; --s-anthropic: #eb6834; --s-google: #2a78d6;
+    --s-cc: #8a63d2; --s-codex: #66707d;
     --warn: #fab219; --warn-ink: #8a5f00; --critical: #d03b3b; --critical-ink: #a02020;
     --good-ink: #006300; --chip: #f0efec;
   }
@@ -29,6 +30,7 @@
       --muted: #898781; --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
       --accent: #3987e5; --accent-ink: #86b6ef;
       --s-openai: #199e70; --s-anthropic: #d95926; --s-google: #3987e5;
+      --s-cc: #9d7ce0; --s-codex: #7d8794;
       --warn: #fab219; --warn-ink: #fab219; --critical: #e66767; --critical-ink: #e66767;
       --good-ink: #0ca30c; --chip: #262624;
     }
@@ -332,6 +334,10 @@
         <button class="btn" onclick="tokenbill.saveNick()">저장</button>
       </span></div>
     <p class="chart-note" style="margin-top:6px">별명은 토큰 리더보드에 표시됩니다.</p>
+    <h2 style="font-size:0.95rem;margin:20px 0 6px">구독 사용량 연동 (MCP)</h2>
+    <p class="chart-note" style="margin:0 0 10px">Claude Code·Codex CLI 등 <b>구독으로 쓰는 AI의 토큰</b>도 리더보드에 합산할 수 있습니다.</p>
+    <div id="upTokenBox"></div>
+    <p class="chart-note" style="margin-top:8px">자세한 방법은 <a href="#" class="guide-link" onclick="tokenbill.closeMy();tokenbill.openGuide();return false">사용 가이드</a>를 참고하세요.</p>
   </div>
 </div>
 
@@ -361,7 +367,14 @@
       <h3>5. 예산 알림</h3>
       <p>상단에서 월 예산($)을 설정해두면, 이번 달 비용이 예산의 <b>80%</b>와 <b>100%</b>에 도달할 때
       가입 이메일로 알림 메일이 발송됩니다 (각 1회, 매달 리셋).</p>
-      <h3>6. 키 보안</h3>
+      <h3>6. 구독 사용량 연동 (Claude Code·Codex CLI)</h3>
+      <p>API가 아니라 <b>구독으로 쓰는 AI의 토큰</b>도 리더보드에 합산할 수 있습니다.
+      마이페이지에서 업로드 토큰을 발급받고, Claude Code 터미널에서 안내된 MCP 등록 명령 한 줄을 실행하면
+      이후 Claude Code를 쓸 때마다 사용량이 자동 업로드됩니다. Codex CLI는
+      <code>codex mcp add tokenbill -- npx -y github:Jonghoon5922/tokenbill --token 토큰</code> 으로 동일하게 등록합니다.
+      등록 후에는 Claude에게 "내 토큰 순위 알려줘"라고 물으면 순위를 답해줍니다.
+      구독 사용량은 본인 PC 로그 기반 자기 신고 값이라 프로바이더 표시에 🖥️가 붙습니다.</p>
+      <h3>7. 키 보안</h3>
       <p>등록한 API 키는 서버에서 암호화되어 저장되며 화면에는 마스킹된 형태로만 표시됩니다.
       해제하면 키와 수집된 데이터가 함께 삭제됩니다.</p>
     </div>
@@ -378,8 +391,13 @@
   var PROVIDERS = {
     openai:    { name: "OpenAI",    color: "var(--s-openai)",    keyPrefix: "sk-admin-" },
     anthropic: { name: "Anthropic", color: "var(--s-anthropic)", keyPrefix: "sk-ant-admin-" },
-    google:    { name: "Google AI", color: "var(--s-google)",    keyPrefix: "AIza" }
+    google:    { name: "Google AI", color: "var(--s-google)",    keyPrefix: "AIza" },
+    // 구독 사용량 (MCP 업로더로 수집)
+    "claude-code": { name: "Claude Code 🖥️", color: "var(--s-cc)" },
+    "codex":       { name: "Codex CLI 🖥️",   color: "var(--s-codex)" },
+    "gemini":      { name: "Gemini CLI 🖥️",  color: "var(--s-google)" }
   };
+  function provMeta(pid) { return PROVIDERS[pid] || { name: pid, color: "var(--accent)" }; }
   var $ = function (id) { return document.getElementById(id); };
   var token = null;
   try { token = localStorage.getItem("tokenbill-token"); } catch (e) {}
@@ -577,8 +595,17 @@
     openGuide: function () { $("guideModal").classList.remove("hidden"); },
     closeGuide: function () { $("guideModal").classList.add("hidden"); },
     openMy: function () {
-      if (me) { $("myEmail").textContent = me.email; $("myNick").value = me.nickname || ""; }
+      if (me) { $("myEmail").textContent = me.email; $("myNick").value = me.nickname || ""; renderUpToken(); }
       $("myModal").classList.remove("hidden");
+    },
+    issueUpToken: function () {
+      api("/api/uploader/token", { method: "POST" })
+        .then(function (r) { me.upload_token = r.upload_token; renderUpToken(); toast("업로드 토큰이 발급되었습니다"); })
+        .catch(function (e) { toast(e.message); });
+    },
+    copyCmd: function (id) {
+      var el = $(id);
+      if (el && navigator.clipboard) navigator.clipboard.writeText(el.textContent).then(function () { toast("복사됨"); });
     },
     closeMy: function () { $("myModal").classList.add("hidden"); },
     saveNick: function () {
@@ -603,6 +630,21 @@
 
   function isOrgOpen(keyId, defOpen) {
     return (keyId in expandedOrgs) ? expandedOrgs[keyId] : !!defOpen;
+  }
+
+  function renderUpToken() {
+    var box = $("upTokenBox");
+    if (!me.upload_token) {
+      box.innerHTML = '<button class="btn" onclick="tokenbill.issueUpToken()">업로드 토큰 발급</button>';
+      return;
+    }
+    var cmd = "claude mcp add tokenbill -- npx -y github:Jonghoon5922/tokenbill --token " + me.upload_token;
+    box.innerHTML =
+      '<p class="chart-note" style="margin:0 0 4px">Claude Code에서 아래 명령 한 줄만 실행하면 끝 (이후 자동 업로드):</p>' +
+      '<pre id="upCmd" style="background:var(--chip);padding:10px;border-radius:8px;font-size:0.7rem;overflow-x:auto;white-space:pre-wrap;word-break:break-all">' + esc(cmd) + '</pre>' +
+      '<div style="display:flex;gap:8px;margin-top:8px">' +
+      '<button class="btn" onclick="tokenbill.copyCmd(\'upCmd\')">명령 복사</button>' +
+      '<button class="btn ghost" onclick="tokenbill.issueUpToken()">토큰 재발급</button></div>';
   }
 
   // 키(조직)별 이번 달 breakdown → [{name, cost, models:[{model, cost, inTok, outTok}]}]
@@ -676,6 +718,9 @@
     $("alertTestBtn").classList.toggle("hidden", !me.alerts_available);
 
     var connected = providers.filter(function (p) { return p.connected; }).map(function (p) { return p.provider; });
+    // 차트·타일은 API 연동 + 구독 업로드 소스를 모두 포함
+    var active = connected.slice();
+    daily.forEach(function (r) { if (active.indexOf(r.provider) < 0) active.push(r.provider); });
     var map = dayMap();
     var mp = monthPrefix();
 
@@ -692,32 +737,32 @@
     var daysLeft = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() - today.getDate();
     var projected = monthTotal + last7avg * daysLeft;
 
-    $("tTotal").textContent = connected.length ? fmt(monthTotal) : "—";
-    $("tTotalSub").textContent = connected.length
-      ? "토큰 " + fmtTok(monthTok) + " · " + connected.map(function (p) { return PROVIDERS[p].name; }).join(" · ")
+    $("tTotal").textContent = active.length ? fmt(monthTotal) : "—";
+    $("tTotalSub").textContent = active.length
+      ? "토큰 " + fmtTok(monthTok) + " · " + active.map(function (p) { return provMeta(p).name; }).join(" · ")
       : "프로바이더를 연결해 보세요";
-    $("tYesterday").textContent = connected.length ? fmt(yesterday) : "—";
+    $("tYesterday").textContent = active.length ? fmt(yesterday) : "—";
     var diff = prior7 > 0 ? (yesterday - prior7) / prior7 : 0;
     var ySub = $("tYesterdaySub");
-    if (!connected.length) { ySub.textContent = " "; ySub.className = "sub"; }
+    if (!active.length) { ySub.textContent = " "; ySub.className = "sub"; }
     else if (Math.abs(diff) < 0.15) { ySub.textContent = "7일 평균과 비슷"; ySub.className = "sub"; }
     else if (diff > 0) { ySub.textContent = "▲ 평균 대비 +" + Math.round(diff * 100) + "%"; ySub.className = "sub up"; }
     else { ySub.textContent = "▼ 평균 대비 " + Math.round(diff * 100) + "%"; ySub.className = "sub down"; }
-    $("tProjected").textContent = connected.length ? fmt(projected) : "—";
+    $("tProjected").textContent = active.length ? fmt(projected) : "—";
 
     var pct = me.budget_usd > 0 ? (monthTotal / me.budget_usd) * 100 : 0;
-    $("tBudget").textContent = connected.length && me.budget_usd > 0 ? Math.round(pct) + "%" : "—";
+    $("tBudget").textContent = active.length && me.budget_usd > 0 ? Math.round(pct) + "%" : "—";
     var meter = $("budgetMeter");
     meter.className = "meter" + (pct >= 100 ? " over" : pct >= 80 ? " near" : "");
     meter.firstElementChild.style.width = Math.min(100, pct) + "%";
-    $("tBudgetSub").textContent = connected.length && me.budget_usd > 0
+    $("tBudgetSub").textContent = active.length && me.budget_usd > 0
       ? fmt(monthTotal) + " / " + fmt(me.budget_usd) : " ";
 
     renderSync(connected);
     renderProviders();
-    renderDaily(map, connected);
+    renderDaily(map, active);
     renderModels();
-    renderInsights(connected, yesterday, prior7, projected, monthTotal, map);
+    renderInsights(active, yesterday, prior7, projected, monthTotal, map);
     renderLeaderboard();
   }
 
@@ -835,7 +880,7 @@
       return;
     }
     lg.innerHTML = connected.map(function (pid) {
-      return '<span class="key"><span class="sw" style="background:' + PROVIDERS[pid].color + '"></span>' + PROVIDERS[pid].name + '</span>';
+      return '<span class="key"><span class="sw" style="background:' + provMeta(pid).color + '"></span>' + provMeta(pid).name + '</span>';
     }).join("");
 
     var days = [], today = new Date();
@@ -871,7 +916,7 @@
         var h = (v / max) * plotH;
         var gapOffset = si > 0 ? 2 : 0;
         svg += '<rect x="' + x + '" y="' + (yBase - acc - h - gapOffset) + '" width="' + bw +
-          '" height="' + Math.max(0.5, h - gapOffset) + '" fill="' + PROVIDERS[pid].color + '"' +
+          '" height="' + Math.max(0.5, h - gapOffset) + '" fill="' + provMeta(pid).color + '"' +
           (si === connected.length - 1 ? ' rx="2"' : '') + '/>';
         acc += h;
       });
@@ -895,7 +940,7 @@
         connected.forEach(function (pid) {
           var v = rec[pid] ? rec[pid].cost : 0; total += v;
           tok += rec[pid] ? rec[pid].tok : 0;
-          if (v > 0) lines.push(PROVIDERS[pid].name + " " + fmt(v));
+          if (v > 0) lines.push(provMeta(pid).name + " " + fmt(v));
         });
         lines.push("합계 " + fmt(total) + " · " + fmtTok(tok) + " tok");
         tip.innerHTML = lines.join("<br>");
@@ -917,7 +962,7 @@
     }
     var items = modelRows.map(function (r) {
       return { model: r.model, cost: r.cost_usd, inTok: r.input_tokens, outTok: r.output_tokens,
-               color: (PROVIDERS[r.provider] || {}).color || "var(--accent)" };
+               color: provMeta(r.provider).color };
     });
     var key = modelView === "tok" ? function (it) { return it.inTok + it.outTok; } : function (it) { return it.cost; };
     items.sort(function (a, b) { return key(b) - key(a); });
@@ -946,7 +991,7 @@
       for (var pid in rec) if (!top || rec[pid].cost > rec[top].cost) top = pid;
       out.push('<div class="insight bad">어제 비용이 7일 평균의 <strong>' +
         (yesterday / prior7).toFixed(1) + '배</strong>였어요' +
-        (top ? ' (주 원인: <strong>' + PROVIDERS[top].name + '</strong>)' : '') +
+        (top ? ' (주 원인: <strong>' + provMeta(top).name + '</strong>)' : '') +
         '. 반복 호출이나 배치 작업이 있었는지 확인해 보세요.</div>');
     }
     if (me.budget_usd > 0 && projected > me.budget_usd) {

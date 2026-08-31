@@ -34,6 +34,8 @@ def init_db():
                 conn.exec_driver_sql(
                     "UPDATE users SET nickname = substr(email, 1, instr(email, '@') - 1) "
                     "WHERE nickname IS NULL OR nickname = ''")
+            if u_cols and "upload_token" not in u_cols:
+                conn.exec_driver_sql("ALTER TABLE users ADD COLUMN upload_token VARCHAR(64)")
             if u_cols and "alert_month" not in u_cols:
                 conn.exec_driver_sql("ALTER TABLE users ADD COLUMN alert_month VARCHAR(7)")
                 conn.exec_driver_sql("ALTER TABLE users ADD COLUMN alert_level INTEGER NOT NULL DEFAULT 0")

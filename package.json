@@ -1,0 +1,10 @@
+{
+  "name": "tokenbill-uploader",
+  "version": "0.1.0",
+  "description": "Tokenbill MCP — AI 구독(Claude Code·Codex CLI) 로컬 사용량을 tokenbill.my에 자동 업로드하고, 대화로 내 순위를 조회합니다.",
+  "bin": {
+    "tokenbill-mcp": "./uploader/index.js"
+  },
+  "engines": { "node": ">=18" },
+  "license": "MIT"
+}
