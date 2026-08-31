@@ -1,12 +1,14 @@
 """Tokenbill — AI API 비용 대시보드 백엔드."""
 import os
 import secrets
+import time
+from collections import defaultdict, deque
 from datetime import date, timedelta
 
 import httpx
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
@@ -42,6 +44,27 @@ def admin_user(user: models.User = Depends(current_user)) -> models.User:
     if not user.is_admin:
         raise HTTPException(403, "관리자 권한이 필요합니다")
     return user
+
+
+# ── 레이트 리밋 (인메모리, IP 기준) ─────────────────────────
+_rate_buckets: dict[str, deque] = defaultdict(deque)
+
+
+def _client_ip(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for", "")
+    return fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "?")
+
+
+def rate_limit(request: Request, scope: str, limit: int, window_sec: int) -> None:
+    """window_sec 동안 IP당 limit회 초과 시 429."""
+    key = f"{scope}:{_client_ip(request)}"
+    now = time.time()
+    q = _rate_buckets[key]
+    while q and q[0] < now - window_sec:
+        q.popleft()
+    if len(q) >= limit:
+        raise HTTPException(429, "요청이 너무 잦습니다 — 잠시 후 다시 시도해 주세요")
+    q.append(now)
 
 
 # ── 스키마 ──────────────────────────────────────────────────
@@ -80,7 +103,8 @@ def auth_config():
 
 
 @app.post("/api/auth/google")
-def google_login(body: GoogleAuthIn, db: Session = Depends(get_db)):
+def google_login(body: GoogleAuthIn, request: Request, db: Session = Depends(get_db)):
+    rate_limit(request, "auth", 20, 300)
     """Google Identity Services ID 토큰 검증 → 이메일 기준 자동 가입/로그인."""
     if not GOOGLE_CLIENT_ID:
         raise HTTPException(400, "구글 로그인이 설정되지 않았습니다")
@@ -111,7 +135,8 @@ def google_login(body: GoogleAuthIn, db: Session = Depends(get_db)):
 
 
 @app.post("/api/auth/register")
-def register(body: AuthIn, db: Session = Depends(get_db)):
+def register(body: AuthIn, request: Request, db: Session = Depends(get_db)):
+    rate_limit(request, "auth", 10, 300)
     if AUTH_GOOGLE_ONLY and GOOGLE_CLIENT_ID:
         raise HTTPException(400, "구글 로그인만 지원합니다")
     if not (body.nickname or "").strip():
@@ -126,7 +151,8 @@ def register(body: AuthIn, db: Session = Depends(get_db)):
 
 
 @app.post("/api/auth/login")
-def login(body: AuthIn, db: Session = Depends(get_db)):
+def login(body: AuthIn, request: Request, db: Session = Depends(get_db)):
+    rate_limit(request, "auth", 10, 300)
     if AUTH_GOOGLE_ONLY and GOOGLE_CLIENT_ID:
         raise HTTPException(400, "구글 로그인만 지원합니다")
     user = db.query(models.User).filter_by(email=body.email.lower()).first()
@@ -371,6 +397,24 @@ def leaderboard(user: models.User = Depends(current_user), db: Session = Depends
         "me": {"rank": my_rank, "tokens": my_tokens, "tier": _tier(my_tokens),
                "percentile": round(my_rank / total * 100)},
         "total_users": len(board),
+    }
+
+
+@app.get("/api/leaderboard/public")
+def leaderboard_public(request: Request, db: Session = Depends(get_db)):
+    """로그인 없이 볼 수 있는 리더보드 — 별명·티어·토큰량만 노출."""
+    rate_limit(request, "pub-lb", 30, 60)
+    month_start = date.today().replace(day=1)
+    rows = db.query(
+        models.UsageDaily.user_id,
+        func.coalesce(func.sum(models.UsageDaily.input_tokens + models.UsageDaily.output_tokens), 0),
+    ).filter(models.UsageDaily.day >= month_start).group_by(models.UsageDaily.user_id) \
+     .order_by(func.sum(models.UsageDaily.input_tokens + models.UsageDaily.output_tokens).desc()).limit(10).all()
+    names = {u.id: (u.nickname or _mask_email(u.email)) for u in db.query(models.User).all()}
+    return {
+        "top": [{"rank": i + 1, "name": names.get(uid, "?"), "tokens": int(t), "tier": _tier(int(t))}
+                for i, (uid, t) in enumerate(rows)],
+        "total_users": db.query(func.count(models.User.id)).scalar(),
     }
 
 

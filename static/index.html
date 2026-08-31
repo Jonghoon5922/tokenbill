@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tokenbill — AI API 비용 대시보드</title>
+<meta name="description" content="OpenAI·Anthropic API 비용과 토큰을 한 화면에서. 프로젝트·모델별 분석과 토큰 리더보드까지.">
+<meta property="og:title" content="Tokenbill — AI API 비용 대시보드">
+<meta property="og:description" content="OpenAI·Anthropic API 비용과 토큰을 한 화면에서. 프로젝트·모델별 분석과 토큰 리더보드까지.">
+<meta property="og:url" content="https://tokenbill.my">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://tokenbill.my/static/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="/static/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
 <style>
@@ -117,7 +125,9 @@
 
   /* ── auth ── */
   #authView { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .auth-wrap { display: flex; gap: 20px; align-items: stretch; justify-content: center; flex-wrap: wrap; width: 100%; }
   .auth-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; width: 100%; max-width: 380px; }
+  .auth-card.pub-lb { padding: 24px; }
   .auth-card h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; text-align: center; }
   .auth-card h1 .won { color: var(--accent); }
   .auth-card .tag { text-align: center; color: var(--ink-2); font-size: 0.85rem; margin: 4px 0 22px; }
@@ -166,6 +176,7 @@
 
 <!-- 로그인 화면 -->
 <div id="authView">
+  <div class="auth-wrap">
   <div class="auth-card">
     <h1>Token<span class="won">bill</span></h1>
     <p class="tag">AI API 비용, 한 화면에서</p>
@@ -184,6 +195,12 @@
       <div class="ordiv"><span>또는</span></div>
       <div id="googleBtn"></div>
     </div>
+  </div>
+  <div class="auth-card pub-lb hidden" id="pubLbCard">
+    <h2 style="font-size:0.95rem;font-weight:700;margin-bottom:12px">🏆 이번 달 토큰 리더보드</h2>
+    <div id="pubLb"></div>
+    <p class="chart-note" style="margin-top:10px">지금 가입하고 순위에 도전해 보세요!</p>
+  </div>
   </div>
 </div>
 
@@ -276,8 +293,9 @@
     </div>
   </div>
 
-  <footer class="ft">Tokenbill — OpenAI·Anthropic은 조직 Admin 키가 필요해요. "demo"로 시작하는 키를 넣으면 체험용 데이터가 생성됩니다.
-    · <a href="#" class="guide-link" onclick="tokenbill.openGuide();return false">사용 가이드</a></footer>
+  <footer class="ft">Tokenbill — OpenAI·Anthropic은 조직 Admin 키가 필요해요.
+    · <a href="#" class="guide-link" onclick="tokenbill.openGuide();return false">사용 가이드</a>
+    · <a href="https://github.com/Jonghoon5922/tokenbill" target="_blank" rel="noopener" class="guide-link">GitHub</a></footer>
 </div>
 </div>
 <!-- 관리자 -->
@@ -941,6 +959,20 @@
   setInterval(function () {
     if (me && me.cooldown_sec > 0) { me.cooldown_sec = Math.max(0, me.cooldown_sec - 30); render(); }
   }, 30000);
+
+  // ── 로그인 화면 공개 리더보드 ──
+  if (!token) {
+    api("/api/leaderboard/public").then(function (r) {
+      if (!r.top.length) return;
+      var medals = ["🥇", "🥈", "🥉"];
+      $("pubLb").innerHTML = r.top.slice(0, 5).map(function (b) {
+        return '<div class="lbrow"><span class="rk">' + (medals[b.rank - 1] || b.rank) + '</span>' +
+          '<span class="nm">' + esc(b.name) + ' ' + b.tier.emoji + ' <span style="color:var(--muted);font-size:0.74rem">' + esc(b.tier.name) + '</span></span>' +
+          '<span class="tk">' + fmtTok(b.tokens) + ' tok</span></div>';
+      }).join("");
+      $("pubLbCard").classList.remove("hidden");
+    }).catch(function () {});
+  }
 
   // ── 구글 로그인 (서버에 GOOGLE_CLIENT_ID가 설정된 경우에만 버튼 표시) ──
   api("/api/auth/config").then(function (cfg) {
