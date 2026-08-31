@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tokenbill — AI API 비용 대시보드</title>
-<meta name="description" content="OpenAI·Anthropic API 비용과 토큰을 한 화면에서. 프로젝트·모델별 분석과 토큰 리더보드까지.">
-<meta property="og:title" content="Tokenbill — AI API 비용 대시보드">
-<meta property="og:description" content="OpenAI·Anthropic API 비용과 토큰을 한 화면에서. 프로젝트·모델별 분석과 토큰 리더보드까지.">
+<title>Tokenbill — 내 AI 토큰 대시보드</title>
+<meta name="description" content="내 AI 토큰, 한 화면에서. Claude Code·Codex·Gemini 구독 토큰과 OpenAI·Anthropic API 사용량을 모아 리더보드에서 경쟁까지.">
+<meta property="og:title" content="Tokenbill — 내 AI 토큰 대시보드">
+<meta property="og:description" content="내 AI 토큰, 한 화면에서. Claude Code·Codex·Gemini 구독 토큰과 OpenAI·Anthropic API 사용량을 모아 리더보드에서 경쟁까지.">
 <meta property="og:url" content="https://tokenbill.my">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://tokenbill.my/static/og.png">
@@ -187,7 +187,7 @@
   <div class="auth-wrap">
   <div class="auth-card">
     <h1>Token<span class="won">bill</span></h1>
-    <p class="tag">AI API 비용, 한 화면에서</p>
+    <p class="tag">내 AI 토큰, 한 화면에서</p>
     <div class="auth-tabs">
       <button id="tabLogin" class="on">로그인</button>
       <button id="tabSignup">회원가입</button>
@@ -218,7 +218,7 @@
   <header class="top">
     <div class="brand">
       <h1>Token<span class="won">bill</span></h1>
-      <span class="tag">AI API 비용, 한 화면에서</span>
+      <span class="tag">내 AI 토큰, 한 화면에서</span>
     </div>
     <div class="hdr-ctls">
       <span class="cur-toggle" role="group" aria-label="표시 통화">
@@ -243,19 +243,19 @@
 
   <div class="band">
     <div class="tile hero">
-      <span class="lbl" id="tTotalLbl">이번 달 총 비용</span>
+      <span class="lbl" id="tTotalLbl">이번 달 토큰</span>
       <span class="val" id="tTotal">—</span>
       <span class="sub" id="tTotalSub">&nbsp;</span>
     </div>
     <div class="tile">
-      <span class="lbl">어제</span>
+      <span class="lbl">어제 토큰</span>
       <span class="val" id="tYesterday">—</span>
       <span class="sub" id="tYesterdaySub">&nbsp;</span>
     </div>
     <div class="tile">
-      <span class="lbl" id="tProjLbl">월말 예상</span>
+      <span class="lbl" id="tProjLbl">비용 · ✅ API</span>
       <span class="val" id="tProjected">—</span>
-      <span class="sub" id="tProjSub">최근 7일 평균 기준</span>
+      <span class="sub" id="tProjSub">&nbsp;</span>
     </div>
     <div class="tile">
       <span class="lbl">예산 대비</span>
@@ -270,7 +270,7 @@
       <section class="card">
         <h2>일별 사용량 — ✅ API <span class="cnt">선택한 달</span>
           <span class="cur-toggle" role="group" aria-label="일별 보기 기준" style="margin-left:auto">
-            <button id="dvCost" class="on">비용</button><button id="dvTok">토큰</button>
+            <button id="dvTok" class="on">토큰</button><button id="dvCost">비용</button>
           </span>
         </h2>
         <div class="legend" id="dailyLegend"></div>
@@ -285,7 +285,7 @@
       <section class="card">
         <h2>모델별 사용량 — ✅ API <span class="cnt">이번 달</span>
           <span class="cur-toggle" role="group" aria-label="모델별 보기 기준" style="margin-left:auto">
-            <button id="mvCost" class="on">비용</button><button id="mvTok">토큰</button>
+            <button id="mvTok" class="on">토큰</button><button id="mvCost">비용</button>
           </span>
         </h2>
         <div id="modelChart"></div>
@@ -477,8 +477,8 @@
 
   // 서버 데이터 캐시
   var me = null, providers = [], daily = [], modelRows = [], breakdown = [], lb = null, aiStats = null;
-  var modelView = "cost";
-  var dailyView = "cost";
+  var modelView = "tok";
+  var dailyView = "tok";
   var lbTrack = "api";  // api(프로바이더 검증) | sub(구독)
   function curMonth() { return iso(new Date()).slice(0, 7); }
   var viewMonth = null;  // 로드 후 curMonth()로 초기화 (iso 정의 이후 사용)
@@ -807,12 +807,12 @@
     });
     return map;
   }
-  function sumRange(map, fromOffset, toOffset) {
+  function sumRange(map, fromOffset, toOffset, key) {
     var t = 0, today = new Date();
     for (var i = fromOffset; i >= toOffset; i--) {
       var d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
       var rec = map[iso(d)];
-      if (rec) for (var pid in rec) t += rec[pid].cost;
+      if (rec) for (var pid in rec) t += rec[pid][key || "cost"];
     }
     return t;
   }
@@ -850,29 +850,32 @@
     var pm = monthPrefix().split("-");
     $("mLabel").textContent = pm[0] + "년 " + Number(pm[1]) + "월" + (isCur ? " · 이번 달" : "");
     $("mNext").disabled = isCur;
-    $("tTotalLbl").textContent = isCur ? "이번 달 총 비용" : Number(pm[1]) + "월 총 비용";
-    $("tProjLbl").textContent = isCur ? "월말 예상" : "월 합계";
-    $("tProjSub").textContent = isCur ? "최근 7일 평균 기준" : "해당 달 실적";
+    $("tTotalLbl").textContent = isCur ? "이번 달 토큰" : Number(pm[1]) + "월 토큰";
+    $("tProjLbl").textContent = (isCur ? "이번 달" : Number(pm[1]) + "월") + " 비용 · ✅ API";
 
     var yesterday = isCur ? sumRange(map, 1, 1) : 0;
     var prior7 = isCur ? sumRange(map, 8, 2) / 7 : 0;
     var last7avg = isCur ? sumRange(map, 7, 1) / 7 : 0;
+    var yestTok = isCur ? sumRange(map, 1, 1, "tok") : 0;
+    var prior7Tok = isCur ? sumRange(map, 8, 2, "tok") / 7 : 0;
     var today = new Date();
     var daysLeft = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() - today.getDate();
     var projected = isCur ? monthTotal + last7avg * daysLeft : monthTotal;
 
-    $("tTotal").textContent = active.length ? fmt(monthTotal) : "—";
+    $("tTotal").textContent = active.length ? fmtTok(monthTok) + " tok" : "—";
     $("tTotalSub").textContent = active.length
-      ? "✅ API " + fmtTok(monthTokApi) + " tok · 🖥️ 구독 " + fmtTok(monthTokSub) + " tok"
+      ? "✅ API " + fmtTok(monthTokApi) + " · 🖥️ 구독 " + fmtTok(monthTokSub)
       : "프로바이더를 연결해 보세요";
-    $("tYesterday").textContent = active.length && isCur ? fmt(yesterday) : "—";
-    var diff = prior7 > 0 ? (yesterday - prior7) / prior7 : 0;
+    $("tYesterday").textContent = active.length && isCur ? fmtTok(yestTok) + " tok" : "—";
+    var diff = prior7Tok > 0 ? (yestTok - prior7Tok) / prior7Tok : 0;
     var ySub = $("tYesterdaySub");
     if (!active.length || !isCur) { ySub.textContent = " "; ySub.className = "sub"; }
     else if (Math.abs(diff) < 0.15) { ySub.textContent = "7일 평균과 비슷"; ySub.className = "sub"; }
     else if (diff > 0) { ySub.textContent = "▲ 평균 대비 +" + Math.round(diff * 100) + "%"; ySub.className = "sub up"; }
     else { ySub.textContent = "▼ 평균 대비 " + Math.round(diff * 100) + "%"; ySub.className = "sub down"; }
-    $("tProjected").textContent = active.length ? fmt(projected) : "—";
+    $("tProjected").textContent = active.length ? fmt(monthTotal) : "—";
+    $("tProjSub").textContent = active.length
+      ? (isCur ? "월말 예상 " + fmt(projected) + " · 7일 평균 기준" : "해당 달 실적") : " ";
 
     var pct = me.budget_usd > 0 ? (monthTotal / me.budget_usd) * 100 : 0;
     $("tBudget").textContent = active.length && me.budget_usd > 0 ? Math.round(pct) + "%" : "—";
