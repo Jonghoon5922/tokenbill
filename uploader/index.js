@@ -142,12 +142,57 @@ function collectCodex() {
   return [...agg.values()];
 }
 
+// ── Gemini CLI (~/.gemini/tmp/**/*.json|.jsonl) ─────────────
+function geminiTokens(t) {
+  if (!t || typeof t !== "object") return null;
+  const n = (keys) => { for (const k of keys) { const v = t[k]; if (typeof v === "number" && v > 0) return Math.floor(v); } return 0; };
+  const input = n(["input", "prompt", "input_tokens", "prompt_tokens"]);       // cached 포함값
+  const output = n(["output", "candidates", "output_tokens", "candidates_tokens"]);
+  const extra = n(["thoughts", "reasoning", "thoughts_tokens", "reasoning_tokens"]) + n(["tool", "tool_tokens"]);
+  if (!input && !output && !extra) return null;
+  return { input, output: output + extra };
+}
+function collectGemini() {
+  const agg = new Map();
+  const base = path.join(os.homedir(), ".gemini", "tmp");
+  const handleMsg = (msg, fallbackDay, fallbackModel) => {
+    if (!msg || msg.type !== "gemini") return;
+    const tok = geminiTokens(msg.tokens);
+    if (!tok) return;
+    const day = (msg.timestamp || "").slice(0, 10) || fallbackDay;
+    const model = String(msg.model || fallbackModel || "gemini").slice(0, 128);
+    addRow(agg, day, model, tok.input, tok.output);
+  };
+  for (const ext of [".json", ".jsonl"]) {
+    for (const file of walkFiles(base, ext)) {
+      let content;
+      try { content = fs.readFileSync(file, "utf8"); } catch { continue; }
+      let fallbackDay = "";
+      try { fallbackDay = fs.statSync(file).mtime.toISOString().slice(0, 10); } catch {}
+      if (ext === ".json") {
+        let rec;
+        try { rec = JSON.parse(content); } catch { continue; }
+        const day = ((rec.startTime || rec.lastUpdated || "").slice(0, 10)) || fallbackDay;
+        if (Array.isArray(rec.messages)) rec.messages.forEach((m) => handleMsg(m, day, rec.model));
+        else handleMsg(rec, day, rec.model);
+      } else {
+        for (const line of content.split("\n")) {
+          if (!line.includes('"tokens"')) continue;
+          try { handleMsg(JSON.parse(line), fallbackDay); } catch {}
+        }
+      }
+    }
+  }
+  return [...agg.values()];
+}
+
 // ── 업로드 ──────────────────────────────────────────────────
 async function syncAll() {
   if (!TOKEN) return "업로드 토큰이 없습니다 — --token 또는 TOKENBILL_TOKEN을 설정하세요.";
   const sources = [
     ["claude-code", collectClaudeCode],
     ["codex", collectCodex],
+    ["gemini", collectGemini],
   ];
   const results = [];
   for (const [source, collect] of sources) {
@@ -176,7 +221,7 @@ async function myRank() {
 
 // ── MCP (stdio, 개행 구분 JSON-RPC) ────────────────────────
 const TOOLS = [
-  { name: "sync_usage", description: "로컬 AI 사용 로그(Claude Code·Codex)를 스캔해 Tokenbill에 지금 업로드합니다.", inputSchema: { type: "object", properties: {} } },
+  { name: "sync_usage", description: "로컬 AI 사용 로그(Claude Code·Codex·Gemini CLI)를 스캔해 Tokenbill에 지금 업로드합니다.", inputSchema: { type: "object", properties: {} } },
   { name: "my_rank", description: "Tokenbill 토큰 리더보드에서 내 이번 달 순위·티어·사용량을 조회합니다.", inputSchema: { type: "object", properties: {} } },
 ];
 
