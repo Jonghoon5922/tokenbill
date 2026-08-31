@@ -211,14 +211,15 @@ def alert_test(user: models.User = Depends(current_user)):
 
 # ── 프로바이더 키 ───────────────────────────────────────────
 @app.get("/api/providers")
-def list_providers(user: models.User = Depends(current_user), db: Session = Depends(get_db)):
-    month_start = date.today().replace(day=1)
-    # 이번 달 비용을 키(조직)별로 한 번에 집계
+def list_providers(month: str | None = None,
+                   user: models.User = Depends(current_user), db: Session = Depends(get_db)):
+    month_start, month_end = _month_range(month)
+    # 선택한 달 비용을 키(조직)별로 한 번에 집계
     cost_by_key = dict(db.query(
         models.UsageDaily.key_id, func.coalesce(func.sum(models.UsageDaily.cost_usd), 0.0),
     ).filter(
         models.UsageDaily.user_id == user.id,
-        models.UsageDaily.day >= month_start,
+        models.UsageDaily.day >= month_start, models.UsageDaily.day <= month_end,
     ).group_by(models.UsageDaily.key_id).all())
     out = []
     for p in PROVIDERS:
@@ -304,15 +305,33 @@ def manual_sync(user: models.User = Depends(current_user), db: Session = Depends
 
 
 # ── 사용량 조회 ─────────────────────────────────────────────
+def _month_range(month: str | None) -> tuple[date, date]:
+    """'YYYY-MM' → (1일, 말일). 없거나 형식이 틀리면 이번 달."""
+    today = date.today()
+    try:
+        y, m = (int(x) for x in (month or "").split("-"))
+        start = date(y, m, 1)
+    except Exception:
+        start = today.replace(day=1)
+    end = (start.replace(year=start.year + 1, month=1) if start.month == 12
+           else start.replace(month=start.month + 1)) - timedelta(days=1)
+    return start, end
+
+
 @app.get("/api/usage/daily")
-def usage_daily(days: int = 30, user: models.User = Depends(current_user), db: Session = Depends(get_db)):
-    days = min(max(days, 1), 90)
-    start = date.today() - timedelta(days=days - 1)
+def usage_daily(days: int = 30, month: str | None = None,
+                user: models.User = Depends(current_user), db: Session = Depends(get_db)):
+    if month:
+        start, end = _month_range(month)
+    else:
+        days = min(max(days, 1), 90)
+        start, end = date.today() - timedelta(days=days - 1), date.today()
     rows = db.query(
         models.UsageDaily.day, models.UsageDaily.provider,
         func.sum(models.UsageDaily.cost_usd), func.sum(models.UsageDaily.input_tokens + models.UsageDaily.output_tokens),
     ).filter(
-        models.UsageDaily.user_id == user.id, models.UsageDaily.day >= start,
+        models.UsageDaily.user_id == user.id,
+        models.UsageDaily.day >= start, models.UsageDaily.day <= end,
     ).group_by(models.UsageDaily.day, models.UsageDaily.provider).all()
     return [
         {"day": d.isoformat(), "provider": p, "cost_usd": round(c, 4), "tokens": int(t)}
@@ -321,14 +340,16 @@ def usage_daily(days: int = 30, user: models.User = Depends(current_user), db: S
 
 
 @app.get("/api/usage/models")
-def usage_models(user: models.User = Depends(current_user), db: Session = Depends(get_db)):
-    month_start = date.today().replace(day=1)
+def usage_models(month: str | None = None,
+                 user: models.User = Depends(current_user), db: Session = Depends(get_db)):
+    start, end = _month_range(month)
     rows = db.query(
         models.UsageDaily.provider, models.UsageDaily.model,
         func.sum(models.UsageDaily.cost_usd),
         func.sum(models.UsageDaily.input_tokens), func.sum(models.UsageDaily.output_tokens),
     ).filter(
-        models.UsageDaily.user_id == user.id, models.UsageDaily.day >= month_start,
+        models.UsageDaily.user_id == user.id,
+        models.UsageDaily.day >= start, models.UsageDaily.day <= end,
     ).group_by(models.UsageDaily.provider, models.UsageDaily.model).all()
     return [
         {"provider": p, "model": m, "cost_usd": round(c, 4),
@@ -338,16 +359,18 @@ def usage_models(user: models.User = Depends(current_user), db: Session = Depend
 
 
 @app.get("/api/usage/breakdown")
-def usage_breakdown(user: models.User = Depends(current_user), db: Session = Depends(get_db)):
-    """이번 달 키(조직) × 프로젝트 × 모델 분해 — 대시보드 드릴다운용."""
-    month_start = date.today().replace(day=1)
+def usage_breakdown(month: str | None = None,
+                    user: models.User = Depends(current_user), db: Session = Depends(get_db)):
+    """선택한 달의 키(조직) × 프로젝트 × 모델 분해 — 대시보드 드릴다운용."""
+    month_start, month_end = _month_range(month)
     rows = db.query(
         models.UsageDaily.key_id, models.UsageDaily.provider,
         models.UsageDaily.project_id, models.UsageDaily.project_name, models.UsageDaily.model,
         func.sum(models.UsageDaily.cost_usd),
         func.sum(models.UsageDaily.input_tokens), func.sum(models.UsageDaily.output_tokens),
     ).filter(
-        models.UsageDaily.user_id == user.id, models.UsageDaily.day >= month_start,
+        models.UsageDaily.user_id == user.id,
+        models.UsageDaily.day >= month_start, models.UsageDaily.day <= month_end,
     ).group_by(
         models.UsageDaily.key_id, models.UsageDaily.provider,
         models.UsageDaily.project_id, models.UsageDaily.project_name, models.UsageDaily.model,

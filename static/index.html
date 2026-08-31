@@ -58,6 +58,10 @@
   .cur-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
   .cur-toggle button { padding: 5px 12px; border: none; background: var(--surface); color: var(--ink-2); font: inherit; font-size: 0.78rem; cursor: pointer; }
   .cur-toggle button.on { background: var(--accent); color: #fff; font-weight: 600; }
+  .monthnav { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .monthnav span { font-weight: 700; font-size: 1.02rem; min-width: 150px; text-align: center; font-variant-numeric: tabular-nums; }
+  .monthnav .btn { padding: 5px 12px; }
+  .monthnav .btn:disabled { opacity: 0.35; }
   .band { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1.2fr; gap: 12px; margin-bottom: 24px; }
   @media (max-width: 800px) { .band { grid-template-columns: 1fr 1fr; } }
   .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 2px; }
@@ -231,9 +235,15 @@
     </div>
   </header>
 
+  <div class="monthnav">
+    <button class="btn ghost" id="mPrev" aria-label="이전 달">◀</button>
+    <span id="mLabel"></span>
+    <button class="btn ghost" id="mNext" aria-label="다음 달">▶</button>
+  </div>
+
   <div class="band">
     <div class="tile hero">
-      <span class="lbl">이번 달 총 비용</span>
+      <span class="lbl" id="tTotalLbl">이번 달 총 비용</span>
       <span class="val" id="tTotal">—</span>
       <span class="sub" id="tTotalSub">&nbsp;</span>
     </div>
@@ -243,9 +253,9 @@
       <span class="sub" id="tYesterdaySub">&nbsp;</span>
     </div>
     <div class="tile">
-      <span class="lbl">월말 예상</span>
+      <span class="lbl" id="tProjLbl">월말 예상</span>
       <span class="val" id="tProjected">—</span>
-      <span class="sub">최근 7일 평균 기준</span>
+      <span class="sub" id="tProjSub">최근 7일 평균 기준</span>
     </div>
     <div class="tile">
       <span class="lbl">예산 대비</span>
@@ -258,7 +268,7 @@
   <div class="cols">
     <div>
       <section class="card">
-        <h2>일별 사용량 — ✅ API <span class="cnt">최근 30일</span>
+        <h2>일별 사용량 — ✅ API <span class="cnt">선택한 달</span>
           <span class="cur-toggle" role="group" aria-label="일별 보기 기준" style="margin-left:auto">
             <button id="dvCost" class="on">비용</button><button id="dvTok">토큰</button>
           </span>
@@ -268,7 +278,7 @@
         <p class="chart-note">막대에 마우스를 올리면 상세 내역이 표시됩니다.</p>
       </section>
       <section class="card">
-        <h2>일별 사용량 — 🖥️ 구독 <span class="cnt">최근 30일 · 토큰</span></h2>
+        <h2>일별 사용량 — 🖥️ 구독 <span class="cnt">선택한 달 · 토큰</span></h2>
         <div class="legend" id="subLegend"></div>
         <div id="subChart"></div>
       </section>
@@ -466,6 +476,8 @@
   var modelView = "cost";
   var dailyView = "cost";
   var lbTrack = "api";  // api(프로바이더 검증) | sub(구독)
+  function curMonth() { return iso(new Date()).slice(0, 7); }
+  var viewMonth = null;  // 로드 후 curMonth()로 초기화 (iso 정의 이후 사용)
   var expandedOrgs = {};  // key_id → true (프로젝트 드릴다운 펼침 상태)
 
   // ── API helper ──
@@ -575,9 +587,11 @@
 
   // ── dashboard data ──
   function refreshAll() {
+    if (!viewMonth) viewMonth = curMonth();
+    var mq = "?month=" + viewMonth;
     return Promise.all([
-      api("/api/me"), api("/api/providers"), api("/api/usage/daily?days=45"), api("/api/usage/models"),
-      api("/api/usage/breakdown"), api("/api/leaderboard")
+      api("/api/me"), api("/api/providers" + mq), api("/api/usage/daily" + mq), api("/api/usage/models" + mq),
+      api("/api/usage/breakdown" + mq), api("/api/leaderboard")
     ]).then(function (rs) {
       me = rs[0]; providers = rs[1]; daily = rs[2]; modelRows = rs[3]; breakdown = rs[4]; lb = rs[5];
       render();
@@ -769,7 +783,17 @@
   function iso(d) {
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   }
-  function monthPrefix() { return iso(new Date()).slice(0, 7); }
+  function monthPrefix() { return viewMonth || curMonth(); }
+  function shiftMonth(delta) {
+    var p = monthPrefix().split("-");
+    var d = new Date(Number(p[0]), Number(p[1]) - 1 + delta, 1);
+    var m = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+    if (m > curMonth()) return;  // 미래 달 이동 방지
+    viewMonth = m;
+    refreshAll();
+  }
+  $("mPrev").addEventListener("click", function () { shiftMonth(-1); });
+  $("mNext").addEventListener("click", function () { shiftMonth(1); });
 
   // ── aggregation from server rows ──
   function dayMap() {
@@ -818,21 +842,29 @@
         if (isApiProv(pid)) monthTokApi += map[date][pid].tok; else monthTokSub += map[date][pid].tok;
       }
     });
-    var yesterday = sumRange(map, 1, 1);
-    var prior7 = sumRange(map, 8, 2) / 7;
-    var last7avg = sumRange(map, 7, 1) / 7;
+    var isCur = monthPrefix() === curMonth();
+    var pm = monthPrefix().split("-");
+    $("mLabel").textContent = pm[0] + "년 " + Number(pm[1]) + "월" + (isCur ? " · 이번 달" : "");
+    $("mNext").disabled = isCur;
+    $("tTotalLbl").textContent = isCur ? "이번 달 총 비용" : Number(pm[1]) + "월 총 비용";
+    $("tProjLbl").textContent = isCur ? "월말 예상" : "월 합계";
+    $("tProjSub").textContent = isCur ? "최근 7일 평균 기준" : "해당 달 실적";
+
+    var yesterday = isCur ? sumRange(map, 1, 1) : 0;
+    var prior7 = isCur ? sumRange(map, 8, 2) / 7 : 0;
+    var last7avg = isCur ? sumRange(map, 7, 1) / 7 : 0;
     var today = new Date();
     var daysLeft = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() - today.getDate();
-    var projected = monthTotal + last7avg * daysLeft;
+    var projected = isCur ? monthTotal + last7avg * daysLeft : monthTotal;
 
     $("tTotal").textContent = active.length ? fmt(monthTotal) : "—";
     $("tTotalSub").textContent = active.length
       ? "✅ API " + fmtTok(monthTokApi) + " tok · 🖥️ 구독 " + fmtTok(monthTokSub) + " tok"
       : "프로바이더를 연결해 보세요";
-    $("tYesterday").textContent = active.length ? fmt(yesterday) : "—";
+    $("tYesterday").textContent = active.length && isCur ? fmt(yesterday) : "—";
     var diff = prior7 > 0 ? (yesterday - prior7) / prior7 : 0;
     var ySub = $("tYesterdaySub");
-    if (!active.length) { ySub.textContent = " "; ySub.className = "sub"; }
+    if (!active.length || !isCur) { ySub.textContent = " "; ySub.className = "sub"; }
     else if (Math.abs(diff) < 0.15) { ySub.textContent = "7일 평균과 비슷"; ySub.className = "sub"; }
     else if (diff > 0) { ySub.textContent = "▲ 평균 대비 +" + Math.round(diff * 100) + "%"; ySub.className = "sub up"; }
     else { ySub.textContent = "▼ 평균 대비 " + Math.round(diff * 100) + "%"; ySub.className = "sub down"; }
@@ -1038,11 +1070,10 @@
       return '<span class="key"><span class="sw" style="background:' + provMeta(pid).color + '"></span>' + provMeta(pid).name + '</span>';
     }).join("");
 
-    var days = [], today = new Date();
-    for (var i = 29; i >= 0; i--) {
-      var d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
-      days.push(iso(d));
-    }
+    var pm = monthPrefix().split("-");
+    var lastDay = new Date(Number(pm[0]), Number(pm[1]), 0).getDate();
+    var days = [];
+    for (var i = 1; i <= lastDay; i++) days.push(pm[0] + "-" + pm[1] + "-" + String(i).padStart(2, "0"));
     var val = function (r) { return dailyView === "tok" ? r.tok : r.cost; };
     var max = 0;
     days.forEach(function (dt) {
@@ -1053,7 +1084,7 @@
     if (max <= 0) max = 1;  // 데이터가 전무할 때만 기본 눈금
 
     var W = 560, H = 200, padT = 12, padB = 24, padL = 4, padR = 4;
-    var plotH = H - padT - padB, cw = (W - padL - padR) / 30, bw = cw * 0.68;
+    var plotH = H - padT - padB, cw = (W - padL - padR) / days.length, bw = cw * 0.68;
     var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto" role="img" aria-label="최근 30일 일별 API 사용량">';
     for (var g = 1; g <= 3; g++) {
       var gy = padT + plotH * (1 - g / 3);
@@ -1158,6 +1189,12 @@
     var el = $("insightBox");
     if (!connected.length) {
       el.innerHTML = '<p class="empty">프로바이더를 연결하면 비용 급증·예산 인사이트를 알려드려요.</p>';
+      return;
+    }
+    if (monthPrefix() !== curMonth()) {
+      var pm = monthPrefix().split("-");
+      el.innerHTML = '<div class="insight ok">' + pm[0] + '년 ' + Number(pm[1]) + '월에는 총 <strong>' +
+        fmt(monthTotal) + '</strong>를 사용했어요.</div>';
       return;
     }
     var out = [];
