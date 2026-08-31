@@ -32,6 +32,9 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")  # 설정하면 구글
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "").lower()    # 이 이메일 계정은 로그인 시 관리자로 자동 승격
 # AUTH_GOOGLE_ONLY=1 이면 이메일/비밀번호 가입·로그인을 막고 구글 로그인만 허용
 AUTH_GOOGLE_ONLY = os.environ.get("AUTH_GOOGLE_ONLY", "") == "1"
+# 설정하면 사이트 내 피드백 폼 → GitHub Issues 자동 등록 활성화
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+FEEDBACK_REPO = os.environ.get("FEEDBACK_REPO", "Jonghoon5922/tokenbill")
 
 
 def _maybe_promote_admin(user: models.User, db: Session) -> None:
@@ -174,6 +177,7 @@ def me(user: models.User = Depends(current_user)):
         "cooldown_min": MANUAL_COOLDOWN_MIN,
         "alerts_available": alerts_available(),
         "upload_token": user.upload_token,
+        "feedback_available": bool(GITHUB_TOKEN),
     }
 
 
@@ -405,6 +409,36 @@ def leaderboard(user: models.User = Depends(current_user), db: Session = Depends
                "percentile": round(my_rank / total * 100)},
         "total_users": len(board),
     }
+
+
+# ── 피드백 → GitHub Issues ─────────────────────────────────
+class FeedbackIn(BaseModel):
+    kind: str = Field(pattern="^(bug|idea)$")
+    title: str = Field(min_length=4, max_length=80)
+    body: str = Field(min_length=4, max_length=2000)
+
+
+@app.post("/api/feedback")
+def submit_feedback(body: FeedbackIn, request: Request,
+                    user: models.User = Depends(current_user)):
+    rate_limit(request, "feedback", 5, 3600)
+    if not GITHUB_TOKEN:
+        raise HTTPException(400, "피드백 접수가 설정되지 않았습니다")
+    prefix = "[버그] " if body.kind == "bug" else "[제안] "
+    issue_body = f"{body.body}\n\n---\n_Tokenbill 사이트 피드백 · 작성자: {user.nickname or '익명'}_"
+    try:
+        r = httpx.post(
+            f"https://api.github.com/repos/{FEEDBACK_REPO}/issues",
+            headers={"Authorization": f"Bearer {GITHUB_TOKEN}",
+                     "Accept": "application/vnd.github+json"},
+            json={"title": prefix + body.title.strip(), "body": issue_body},
+            timeout=15,
+        )
+    except Exception:
+        raise HTTPException(502, "접수 서버에 연결할 수 없습니다 — 잠시 후 다시 시도해 주세요")
+    if r.status_code != 201:
+        raise HTTPException(502, "접수에 실패했습니다 — 잠시 후 다시 시도해 주세요")
+    return {"ok": True, "url": r.json().get("html_url")}
 
 
 # ── 구독 사용량 업로더 (MCP) ────────────────────────────────
