@@ -911,7 +911,8 @@
     renderDaily(map, apiActive, "dailyChart", "dailyLegend", dailyView,
       "Admin 키를 연결하면 일별 사용량이 표시됩니다.");
     renderDaily(map, subActive, "subChart", "subLegend", "tok",
-      "마이페이지에서 MCP를 연동하면 구독 토큰이 표시됩니다.");
+      me.upload_token ? "이 달 구독 사용 기록이 아직 없습니다 — CLI 실행 시 자동 업로드됩니다."
+                      : "마이페이지에서 MCP를 연동하면 구독 토큰이 표시됩니다.");
     renderModels();
     renderSubModels();
     renderInsights(apiActive, yesterday, prior7, projected, monthTotal, map);
@@ -1082,8 +1083,11 @@
     var srcs = Object.keys(bySrc);
     $("subCnt").textContent = srcs.length ? srcs.length + "개 소스" : "";
     if (!srcs.length) {
-      el.innerHTML = '<p class="empty" style="padding:10px 4px">Claude Code·Codex·Gemini CLI의 구독 토큰을 자동 수집합니다.<br>' +
-        '<button class="btn" style="margin-top:10px" onclick="tokenbill.openMy()">마이페이지에서 연동하기</button></p>';
+      el.innerHTML = me.upload_token
+        ? '<p class="empty" style="padding:10px 4px">🖥️ 연동되어 있습니다 — 이 달 사용 기록이 아직 없어요.<br>' +
+          '<span style="font-size:0.78rem">Claude Code 등 CLI를 실행하면 자동으로 업로드됩니다.</span></p>'
+        : '<p class="empty" style="padding:10px 4px">Claude Code·Codex·Gemini CLI의 구독 토큰을 자동 수집합니다.<br>' +
+          '<button class="btn" style="margin-top:10px" onclick="tokenbill.openMy()">마이페이지에서 연동하기</button></p>';
       return;
     }
     el.innerHTML = srcs.map(function (src) {
