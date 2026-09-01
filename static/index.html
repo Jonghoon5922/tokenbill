@@ -909,7 +909,9 @@
     $("dvCost").className = dailyView === "cost" ? "on" : "";
     $("dvTok").className = dailyView === "tok" ? "on" : "";
     renderDaily(map, apiActive, "dailyChart", "dailyLegend", dailyView,
-      "Admin 키를 연결하면 일별 사용량이 표시됩니다.");
+      connected.length
+        ? "이 달 API 사용 기록이 아직 없습니다 — 매일 03시 자동 수집되며, '지금 갱신'으로 즉시 수집할 수 있어요."
+        : "Admin 키를 연결하면 일별 사용량이 표시됩니다.");
     renderDaily(map, subActive, "subChart", "subLegend", "tok",
       me.upload_token ? "이 달 구독 사용 기록이 아직 없습니다 — CLI 실행 시 자동 업로드됩니다."
                       : "마이페이지에서 MCP를 연동하면 구독 토큰이 표시됩니다.");
@@ -926,7 +928,7 @@
     function section(title, data) {
       var n = data.active_users;
       if (!n || !data.sources.length) {
-        return '<p class="chart-note" style="margin:4px 0 10px">' + title + ' — 아직 활성 사용자가 없습니다.</p>';
+        return '<p class="chart-note" style="margin:4px 0 10px">' + title + ' — 이 달 활성 사용자가 아직 없습니다.</p>';
       }
       var totalTok = data.sources.reduce(function (s, e) { return s + e.tokens; }, 0) || 1;
       var html = '<p class="chart-note" style="margin:4px 0 6px"><b>' + title + '</b> · 활성 ' + n + '명' +
@@ -965,15 +967,20 @@
         '<div class="ts">이번 달 ' + fmtTok(myTok) + ' tok · ' + myRank + '위 / ' + users + '명 (상위 ' + Math.round(myRank / Math.max(users, 1) * 100) + '%)</div>' +
         '<div class="ts">' + nextTxt + '</div></div></div>';
     } else {
+      var apiConnected = providers.some(function (p) { return p.connected; });
+      var subConnected = !!me.upload_token;
+      var hint = isApi
+        ? (apiConnected ? '연결은 정상이에요 — 이 달 API 사용이 수집되면 자동 진입합니다.' : 'Admin 키를 연동하면 API 트랙에 진입합니다.')
+        : (subConnected ? '연동은 정상이에요 — CLI를 실행하면 자동 업로드되어 진입합니다.' : '마이페이지에서 MCP를 연동하면 구독 트랙에 진입합니다.');
       html = '<div class="mytier"><span class="emj">' + (isApi ? '✅' : '🖥️') + '</span>' +
-        '<div><div class="tn">아직 이 트랙 기록이 없어요</div>' +
-        '<div class="ts">' + (isApi ? 'Admin 키를 연동하면 API 트랙에 진입합니다.' : '마이페이지에서 MCP를 연동하면 구독 트랙에 진입합니다.') + '</div></div></div>';
+        '<div><div class="tn">이 달 트랙 기록이 아직 없어요</div>' +
+        '<div class="ts">' + hint + '</div></div></div>';
     }
     var board = isApi ? lb.top_api : lb.top_sub;
     if (!board.length) {
       html += '<p class="empty">' + (isApi
-        ? '아직 API 사용 기록이 없습니다 — Admin 키를 연동해 보세요.'
-        : '아직 구독 사용 기록이 없습니다 — 마이페이지에서 MCP를 연동해 보세요.') + '</p>';
+        ? '이 달 API 사용 기록이 아직 없습니다 — 수집되는 대로 순위가 표시됩니다.'
+        : '이 달 구독 사용 기록이 아직 없습니다 — CLI 실행 시 자동 업로드됩니다.') + '</p>';
     } else {
       var medals = ["🥇", "🥈", "🥉"];
       html += board.map(function (b) {
@@ -1017,7 +1024,7 @@
         var cls = 'projbox' + (flat ? ' flat' : '');
         var projs = projectsOfKey(keyId);
         if (!projs.length) {
-          return '<div class="' + cls + '"><p class="empty" style="padding:8px 0">이번 달 사용 내역이 없습니다.</p></div>';
+          return '<div class="' + cls + '"><p class="empty" style="padding:8px 0">이 달 사용 내역이 아직 없습니다 — 연결은 정상입니다.</p></div>';
         }
         return projs.map(function (pr) {
           return '<div class="' + cls + '">' +
@@ -1219,7 +1226,10 @@
     $("mvTok").className = modelView === "tok" ? "on" : "";
     var apiRows = modelRows.filter(function (r) { return isApiProv(r.provider); });
     if (!apiRows.length) {
-      el.innerHTML = '<p class="empty">Admin 키 연결 후 모델별 사용량이 집계됩니다.</p>';
+      var hasKeys = providers.some(function (p) { return p.connected; });
+      el.innerHTML = '<p class="empty">' + (hasKeys
+        ? '이 달 API 사용 기록이 아직 없습니다.'
+        : 'Admin 키 연결 후 모델별 사용량이 집계됩니다.') + '</p>';
       return;
     }
     var items = apiRows.map(function (r) {
