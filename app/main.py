@@ -601,11 +601,14 @@ def usage_import(body: ImportIn, request: Request, db: Session = Depends(get_db)
         return {"ok": True, "rows": 0}
     aid, aname = _account_key(body.account) if body.account else (None, None)
     lo, hi = min(k[0] for k in agg), max(k[0] for k in agg)
-    # 같은 소스라도 다른 계정(다른 PC)의 데이터는 건드리지 않는다 — 이 계정 범위만 교체
+    # 같은 소스라도 다른 계정(다른 PC)의 데이터는 건드리지 않는다 — 이 계정 범위만 교체.
+    # 계정이 붙은 업로드는 구버전 업로더가 남긴 계정 미표시(NULL) 행도 함께 흡수해 중복을 막는다.
+    scope = (models.UsageDaily.project_id == aid) | models.UsageDaily.project_id.is_(None) \
+        if aid else models.UsageDaily.project_id.is_(None)
     db.query(models.UsageDaily).filter(
         models.UsageDaily.user_id == user.id,
         models.UsageDaily.provider == body.source,
-        (models.UsageDaily.project_id == aid) if aid else models.UsageDaily.project_id.is_(None),
+        scope,
         models.UsageDaily.day >= lo, models.UsageDaily.day <= hi,
     ).delete()
     for (d, model), (in_tok, out_tok) in agg.items():
