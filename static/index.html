@@ -188,11 +188,11 @@
   <div class="auth-card">
     <h1>Token<span class="won">bill</span></h1>
     <p class="tag">내 AI 토큰, 한 화면에서</p>
-    <div class="auth-tabs">
+    <div class="auth-tabs hidden" id="authTabs">
       <button id="tabLogin" class="on">로그인</button>
       <button id="tabSignup">회원가입</button>
     </div>
-    <form id="authForm">
+    <form id="authForm" class="hidden">
       <input type="email" id="authEmail" placeholder="이메일" required autocomplete="email">
       <input type="password" id="authPw" placeholder="비밀번호 (8자 이상)" required minlength="8" autocomplete="current-password">
       <input type="text" id="authNick" class="hidden" placeholder="별명 (리더보드에 표시됩니다)" maxlength="32" autocomplete="nickname">
@@ -1326,14 +1326,15 @@
   }
 
   // ── 구글 로그인 (서버에 GOOGLE_CLIENT_ID가 설정된 경우에만 버튼 표시) ──
+  // 이메일/비밀번호 폼은 기본 숨김 — 구글 전용이 아닐 때만 표시 (전용 모드에서 순간 노출 방지)
+  function showEmailAuth() {
+    $("authTabs").classList.remove("hidden");
+    $("authForm").classList.remove("hidden");
+  }
   api("/api/auth/config").then(function (cfg) {
+    if (!cfg.google_only) showEmailAuth();
+    else $("googleWrap").classList.add("solo");
     if (!cfg.google_client_id) return;
-    if (cfg.google_only) {
-      // 구글 전용 모드 — 이메일/비밀번호 UI 숨김
-      document.querySelector(".auth-tabs").classList.add("hidden");
-      $("authForm").classList.add("hidden");
-      $("googleWrap").classList.add("solo");
-    }
     var s = document.createElement("script");
     s.src = "https://accounts.google.com/gsi/client";
     s.onload = function () {
@@ -1353,7 +1354,7 @@
       $("googleWrap").classList.remove("hidden");
     };
     document.head.appendChild(s);
-  }).catch(function () {});
+  }).catch(function () { showEmailAuth(); });  // 설정 조회 실패 시 폼 노출 (잠금 방지)
 
   if (token) showDash();
 })();
