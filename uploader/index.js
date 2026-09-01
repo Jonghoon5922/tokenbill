@@ -186,6 +186,21 @@ function collectGemini() {
   return [...agg.values()];
 }
 
+// ── 계정 식별 (소스별 로컬 설정에서 이메일 읽기) ────────────
+function claudeAccountEmail() {
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(os.homedir(), ".claude.json"), "utf8"));
+    return (j.oauthAccount && j.oauthAccount.emailAddress) || null;
+  } catch { return null; }
+}
+function geminiAccountEmail() {
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(os.homedir(), ".gemini", "google_accounts.json"), "utf8"));
+    return j.active || (Array.isArray(j.accounts) && j.accounts[0]) || null;
+  } catch { return null; }
+}
+const ACCOUNT_OF = { "claude-code": claudeAccountEmail, "codex": () => null, "gemini": geminiAccountEmail };
+
 // ── 업로드 ──────────────────────────────────────────────────
 async function syncAll() {
   if (!TOKEN) return "업로드 토큰이 없습니다 — --token 또는 TOKENBILL_TOKEN을 설정하세요.";
@@ -199,8 +214,10 @@ async function syncAll() {
     let rows = [];
     try { rows = collect(); } catch (e) { results.push(`${source}: 스캔 실패 (${e.message})`); continue; }
     if (!rows.length) { results.push(`${source}: 사용 기록 없음`); continue; }
+    let account = null;
+    try { account = ACCOUNT_OF[source] ? ACCOUNT_OF[source]() : null; } catch {}
     try {
-      const r = await request("POST", "/api/usage/import", { source, rows: rows.slice(0, 2000) });
+      const r = await request("POST", "/api/usage/import", { source, account, rows: rows.slice(0, 2000) });
       results.push(r.status === 200
         ? `${source}: ${r.json.rows}일×모델 업로드 (${r.json.from}~${r.json.to})`
         : `${source}: 업로드 실패 (HTTP ${r.status}${r.json.detail ? " — " + r.json.detail : ""})`);

@@ -433,7 +433,9 @@
       <p><b>③ 끝 — 이후 자동</b> — CLI를 실행할 때마다 최근 60일 사용량이 자동 업로드됩니다.
       하나만 등록해도 PC의 세 CLI 기록을 전부 수집하며, AI에게 "내 토큰 순위 알려줘"라고 물으면 순위를 답해줍니다.</p>
       <p>토큰이 유출된 것 같으면 마이페이지에서 <b>재발급</b>하세요 (이전 토큰 즉시 무효).
-      구독 사용량은 본인 PC 로그 기반이라 프로바이더 표시에 🖥️가 붙고, 비용은 $0(정액 구독)으로 집계됩니다.</p>
+      구독 사용량은 본인 PC 로그 기반이라 프로바이더 표시에 🖥️가 붙고, 비용은 $0(정액 구독)으로 집계됩니다.
+      해당 AI의 로그인 이메일은 <b>마스킹된 형태로만</b> 표시·보관되어(원본 미저장),
+      계정을 여러 개 쓰는 경우 계정별로 사용량이 구분됩니다.</p>
       <h3>7. 문제가 있거나 아이디어가 있나요?</h3>
       <p>헤더의 <b>피드백</b> 버튼(또는 하단 "버그 신고·기능 제안")으로 알려주세요 —
       <a href="#" class="guide-link" onclick="tokenbill.closeGuide();tokenbill.openFb();return false">지금 신고하기</a>.
@@ -1083,9 +1085,13 @@
     var bySrc = {};
     breakdown.forEach(function (r) {
       if (r.key_id !== null) return;
-      var s = bySrc[r.provider] = bySrc[r.provider] || { tokens: 0, models: [] };
-      s.tokens += r.input_tokens + r.output_tokens;
-      s.models.push({ model: r.model, tok: r.input_tokens + r.output_tokens });
+      var s = bySrc[r.provider] = bySrc[r.provider] || { tokens: 0, accounts: {} };
+      var tok = r.input_tokens + r.output_tokens;
+      s.tokens += tok;
+      var an = r.project_name || "";
+      var a = s.accounts[an] = s.accounts[an] || { tokens: 0, models: [] };
+      a.tokens += tok;
+      a.models.push({ model: r.model, tok: tok });
     });
     var srcs = Object.keys(bySrc);
     $("subCnt").textContent = srcs.length ? srcs.length + "개 소스" : "";
@@ -1101,18 +1107,28 @@
       var s = bySrc[src], meta = provMeta(src);
       var oid = "sub:" + src;
       var open = isOrgOpen(oid, false);
-      s.models.sort(function (a, b) { return b.tok - a.tok; });
+      var accNames = Object.keys(s.accounts);
       var html = '<div class="prov"><span class="dot" style="background:' + meta.color + '"></span>' +
         '<div class="nm" style="cursor:pointer" onclick="tokenbill.toggleOrg(\'' + oid + '\', false)">' +
         '<span class="arrow" style="display:inline-block;width:14px;color:var(--muted);font-size:0.7rem">' + (open ? '▾' : '▸') + '</span>' + meta.name +
-        '<span class="key">MCP 자동 업로드 · 구독</span></div>' +
+        '<span class="key">MCP 자동 업로드 · 구독' +
+        (accNames.length === 1 && accNames[0] ? ' · ' + esc(accNames[0]) : accNames.length > 1 ? ' · 계정 ' + accNames.length + '개' : '') +
+        '</span></div>' +
         '<div class="amt">' + fmtTok(s.tokens) + ' tok<span class="cap">이번 달</span></div>' +
         '<button class="btn ghost" onclick="tokenbill.subDelete(\'' + src + '\', \'' + provMeta(src).name.replace(/'/g, "") + '\')">삭제</button></div>';
       if (open) {
-        html += '<div class="projbox flat">' + s.models.map(function (m) {
-          return '<div class="mline"><span class="mnm">' + esc(m.model) + '</span>' +
-            '<span class="mv">' + fmtTok(m.tok) + ' tok</span></div>';
-        }).join("") + '</div>';
+        accNames.sort(function (a, b) { return s.accounts[b].tokens - s.accounts[a].tokens; });
+        html += accNames.map(function (an) {
+          var a = s.accounts[an];
+          a.models.sort(function (x, y) { return y.tok - x.tok; });
+          var head = (accNames.length > 1 || an)
+            ? '<div class="projrow"><span>' + (an ? esc(an) : '계정 미표시') + '</span><span class="v">' + fmtTok(a.tokens) + ' tok</span></div>'
+            : '';
+          return '<div class="projbox flat">' + head + a.models.map(function (m) {
+            return '<div class="mline"><span class="mnm">' + esc(m.model) + '</span>' +
+              '<span class="mv">' + fmtTok(m.tok) + ' tok</span></div>';
+          }).join("") + '</div>';
+        }).join("");
       }
       return html;
     }).join("");

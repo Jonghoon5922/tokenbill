@@ -552,7 +552,18 @@ class ImportRow(BaseModel):
 
 class ImportIn(BaseModel):
     source: str = Field(pattern="^(claude-code|codex|gemini)$")
+    account: str | None = Field(default=None, max_length=255)  # 해당 AI 계정 이메일 (서버는 마스킹+해시만 저장)
     rows: list[ImportRow] = Field(max_length=2000)
+
+
+def _account_key(email: str) -> tuple[str, str]:
+    """원본 이메일은 저장하지 않는다 — (해시 ID, 마스킹 표시명)만 생성."""
+    import hashlib
+    email = email.strip().lower()
+    aid = "acc_" + hashlib.sha256(email.encode()).hexdigest()[:12]
+    local, _, domain = email.partition("@")
+    shown = (local[:4] + "***@" + domain) if domain else (local[:4] + "***")
+    return aid, shown
 
 
 def _uploader_user(request: Request, db: Session) -> models.User:
@@ -588,16 +599,19 @@ def usage_import(body: ImportIn, request: Request, db: Session = Depends(get_db)
         a[1] += r.output_tokens
     if not agg:
         return {"ok": True, "rows": 0}
+    aid, aname = _account_key(body.account) if body.account else (None, None)
     lo, hi = min(k[0] for k in agg), max(k[0] for k in agg)
+    # 같은 소스라도 다른 계정(다른 PC)의 데이터는 건드리지 않는다 — 이 계정 범위만 교체
     db.query(models.UsageDaily).filter(
         models.UsageDaily.user_id == user.id,
         models.UsageDaily.provider == body.source,
+        (models.UsageDaily.project_id == aid) if aid else models.UsageDaily.project_id.is_(None),
         models.UsageDaily.day >= lo, models.UsageDaily.day <= hi,
     ).delete()
     for (d, model), (in_tok, out_tok) in agg.items():
         db.add(models.UsageDaily(
             user_id=user.id, key_id=None, day=d, provider=body.source,
-            project_id=None, project_name=None, model=model,
+            project_id=aid, project_name=aname, model=model,
             # 구독 사용량은 실제 청구 비용이 아니므로 $0 — 토큰·리더보드에만 합산
             cost_usd=0.0,
             input_tokens=in_tok, output_tokens=out_tok,
