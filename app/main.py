@@ -9,7 +9,7 @@ import httpx
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import case, func
@@ -750,10 +750,26 @@ def admin_sync_all(admin: models.User = Depends(admin_user), db: Session = Depen
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+# ?lang=en 공유 링크는 OG 미리보기(크롤러는 JS 미실행)도 영문이어야 한다
+_META_EN = {
+    '<html lang="ko">': '<html lang="en">',
+    "Tokenbill — 내 AI 토큰 대시보드": "Tokenbill — Your AI Token Dashboard",
+    "내 AI 토큰, 한 화면에서. Claude Code·Codex·Gemini 구독 토큰과 OpenAI·Anthropic API 사용량을 모아 리더보드에서 경쟁까지.":
+        "Your AI tokens, on one screen. Claude Code, Codex and Gemini subscription tokens plus OpenAI and Anthropic API usage — and a leaderboard to compete on.",
+}
+
+
 @app.get("/", include_in_schema=False)
-def index():
+def index(request: Request):
     # 프론트가 단일 HTML이라 구버전 캐시가 남으면 새 API와 어긋난다 → 항상 재검증
-    return FileResponse("static/index.html", headers={"Cache-Control": "no-cache"})
+    headers = {"Cache-Control": "no-cache"}
+    if request.query_params.get("lang") == "en":
+        with open("static/index.html", encoding="utf-8") as f:
+            html = f.read()
+        for ko, en in _META_EN.items():
+            html = html.replace(ko, en)
+        return HTMLResponse(html, headers=headers)
+    return FileResponse("static/index.html", headers=headers)
 
 
 @app.get("/privacy", include_in_schema=False)
