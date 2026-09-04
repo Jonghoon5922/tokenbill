@@ -696,7 +696,7 @@
       '<div class="tile"><span class="lbl">' + tr("비용 · ✅ API", "Cost · ✅ API") + '</span><span class="val">' + fmt(stats.month_cost_usd) + '</span>' +
       '<span class="sub">' + tr("연결된 키 " + stats.keys + "개", stats.keys + " keys connected") + '</span></div>' +
       '<div class="tile"><span class="lbl">' + tr("서버", "Server") + '</span><span class="val" style="color:var(--good-ink)">' + tr("정상", "OK") + '</span><span class="sub">' + tr("매일 03시 자동 수집", "Auto-sync daily 03:00 KST") + '</span></div>';
-    $("adminUserCnt").textContent = tr(users.length + "명", users.length + " users");
+    $("adminUserCnt").textContent = tr(users.length + "명", users.length + (users.length > 1 ? " users" : " user"));
     var ago = function (iso) {
       if (!iso) return "—";
       var m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -1244,7 +1244,7 @@
       a.models.push({ model: r.model, tok: tok });
     });
     var srcs = Object.keys(bySrc);
-    $("subCnt").textContent = srcs.length ? tr(srcs.length + "개 소스", srcs.length + " sources") : "";
+    $("subCnt").textContent = srcs.length ? tr(srcs.length + "개 소스", srcs.length + (srcs.length > 1 ? " sources" : " source")) : "";
     if (!srcs.length) {
       el.innerHTML = me.upload_token
         ? '<p class="empty" style="padding:10px 4px">' + tr('🖥️ 연동되어 있습니다 — 이 달 사용 기록이 아직 없어요.', '🖥️ Sync is set up — no usage this month yet.') + '<br>' +
