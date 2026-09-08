@@ -198,6 +198,17 @@ def update_me(body: SettingsIn, user: models.User = Depends(current_user), db: S
     return {"ok": True}
 
 
+@app.delete("/api/me")
+def delete_me(user: models.User = Depends(current_user), db: Session = Depends(get_db)):
+    """회원 탈퇴 — 계정과 수집 데이터 전부 삭제."""
+    if user.is_admin:
+        raise HTTPException(400, "관리자 계정은 탈퇴할 수 없습니다 — 관리자 해제 후 진행하세요")
+    db.query(models.UsageDaily).filter_by(user_id=user.id).delete()
+    db.delete(user)  # provider_keys는 cascade로 함께 삭제
+    db.commit()
+    return {"ok": True}
+
+
 @app.post("/api/alerts/test")
 def alert_test(user: models.User = Depends(current_user)):
     if not alerts_available():

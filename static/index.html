@@ -396,6 +396,9 @@
     <p class="chart-note" style="margin:0 0 10px" id="myIntro">Claude Code·Codex CLI 등 <b>구독으로 쓰는 AI의 토큰</b>도 리더보드에 합산할 수 있습니다.</p>
     <div id="upTokenBox"></div>
     <p class="chart-note" style="margin-top:8px" id="myGuideRef">자세한 방법은 <a href="#" class="guide-link" onclick="tokenbill.closeMy();tokenbill.openGuide();return false">사용 가이드</a>를 참고하세요.</p>
+    <p class="chart-note" style="margin-top:18px;border-top:1px solid var(--grid);padding-top:12px">
+      <a href="#" class="guide-link" style="color:var(--critical-ink)" onclick="tokenbill.deleteMe();return false">회원 탈퇴</a>
+      <span>— 계정·API 키·수집 데이터가 즉시 삭제됩니다</span></p>
   </div>
 </div>
 
@@ -507,7 +510,9 @@
     "보내기": "Send",
     "이메일": "Email", "별명": "Nickname", "저장": "Save",
     "별명은 토큰 리더보드에 표시됩니다.": "Your nickname appears on the token leaderboard.",
-    "구독 사용량 연동 (MCP)": "Subscription usage sync (MCP)"
+    "구독 사용량 연동 (MCP)": "Subscription usage sync (MCP)",
+    "회원 탈퇴": "Delete account",
+    "— 계정·API 키·수집 데이터가 즉시 삭제됩니다": "— your account, API keys and all collected data are deleted immediately"
   };
 
   var EN_GUIDE =
@@ -874,6 +879,15 @@
       if (!confirm(msg)) return;
       api("/api/usage/subscription/" + source, { method: "DELETE" })
         .then(function () { toast(tr("삭제 완료", "Deleted")); return refreshAll(); })
+        .catch(function (e) { toast(e.message); });
+    },
+    deleteMe: function () {
+      var msg = tr(
+        "정말 탈퇴할까요?\n\n계정과 API 키, 수집된 사용량 데이터가 모두 즉시 삭제되며 되돌릴 수 없습니다.\nPC에 MCP 등록이 남아 있으면 'claude mcp remove tokenbill'로 정리하세요.",
+        "Delete your account?\n\nYour account, API keys and all collected usage data are deleted immediately and cannot be recovered.\nIf MCP is still registered on your PC, clean it up with 'claude mcp remove tokenbill'.");
+      if (!confirm(msg)) return;
+      api("/api/me", { method: "DELETE" })
+        .then(function () { toast(tr("탈퇴가 완료되었습니다. 이용해 주셔서 감사합니다.", "Your account has been deleted. Thanks for trying Tokenbill.")); tokenbill.closeMy(); logout(); })
         .catch(function (e) { toast(e.message); });
     },
     adminDelete: function (userId, email) {
