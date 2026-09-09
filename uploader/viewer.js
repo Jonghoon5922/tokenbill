@@ -419,6 +419,16 @@ function start(port, opts) {
     const hostHdr = String(req.headers.host || "");
     if (!/^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(hostHdr)) { res.writeHead(403); return res.end("forbidden"); }
     try {
+      if (req.method === "OPTIONS") {
+        // 공개 사이트 → 로컬 주소 fetch에 필요한 PNA/CORS preflight 응답
+        res.writeHead(204, {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, OPTIONS",
+          "Access-Control-Allow-Headers": "*",
+          "Access-Control-Allow-Private-Network": "true",
+        });
+        return res.end();
+      }
       if (u.pathname === "/api/ping") {
         // 포탈(tokenbill.my)의 '뷰어 실행 중' 감지용 — 민감 정보 없음이라 CORS 허용
         res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });

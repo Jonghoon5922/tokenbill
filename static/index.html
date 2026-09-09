@@ -311,7 +311,8 @@
       </section>
       <section class="card">
         <h2>구독 연동 — 🖥️ MCP <span class="cnt" id="subCnt"></span>
-          <button class="btn ghost" id="viewerBtn" style="margin-left:auto;font-size:0.74rem;padding:4px 10px">🗂️ 대화 뷰어</button>
+          <a class="btn ghost" id="viewerBtn" href="http://127.0.0.1:8377" target="_blank" rel="noopener"
+             style="margin-left:auto;font-size:0.74rem;padding:4px 10px;text-decoration:none">🗂️ 대화 뷰어</a>
         </h2>
         <div id="subProvList"></div>
       </section>
@@ -789,17 +790,17 @@
   $("lbApi").addEventListener("click", function () { lbTrack = "api"; render(); });
   $("lbSub").addEventListener("click", function () { lbTrack = "sub"; render(); });
 
-  // 로컬 대화 뷰어 — MCP 업로더가 내 PC에서 띄우는 127.0.0.1 서버를 연다 (서버는 대화를 볼 수 없음)
+  // 로컬 대화 뷰어 — MCP 업로더가 내 PC에서 띄우는 127.0.0.1 서버를 새 탭으로 연다 (서버는 대화를 볼 수 없음).
+  // 링크 탐색 자체는 그대로 두고, ping은 꺼져 있을 때 안내 토스트용으로만 쓴다 (PNA로 fetch가 막혀도 탭은 열림).
   $("viewerBtn").addEventListener("click", function () {
-    var url = "http://127.0.0.1:8377";
     var ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
-    var timer = ctl && setTimeout(function () { ctl.abort(); }, 1500);
-    fetch(url + "/api/ping", ctl ? { signal: ctl.signal } : {})
-      .then(function (r) { if (!r.ok) throw new Error(); clearTimeout(timer); window.open(url, "_blank", "noopener"); })
+    var timer = ctl && setTimeout(function () { ctl.abort(); }, 2000);
+    fetch("http://127.0.0.1:8377/api/ping", ctl ? { signal: ctl.signal } : {})
+      .then(function () { clearTimeout(timer); })
       .catch(function () {
         clearTimeout(timer);
-        toast(tr("로컬 뷰어가 꺼져 있어요 — Claude Code가 켜져 있으면 자동 실행됩니다. 수동 실행: npx -y github:Jonghoon5922/tokenbill --viewer",
-                 "Local viewer is not running — it starts automatically while Claude Code is open. Manual: npx -y github:Jonghoon5922/tokenbill --viewer"));
+        toast(tr("뷰어 탭에 오류가 보이면 꺼져 있는 거예요 — Claude Code를 켜두면 자동 실행되고, 수동은: npx -y github:Jonghoon5922/tokenbill --viewer",
+                 "If the viewer tab shows an error, it's not running — it starts automatically while Claude Code is open. Manual: npx -y github:Jonghoon5922/tokenbill --viewer"));
       });
   });
 
