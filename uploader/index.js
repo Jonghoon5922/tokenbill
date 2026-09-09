@@ -26,6 +26,12 @@ const TOKEN = arg("--token") || process.env.TOKENBILL_TOKEN || "";
 const SERVER = (arg("--server") || process.env.TOKENBILL_SERVER || "https://tokenbill.my").replace(/\/$/, "");
 const LOOKBACK_DAYS = 60;
 
+// ── 로컬 뷰어 모드 (--viewer): 업로드·MCP 없이 대화 열람 웹 UI만 실행 ──
+if (process.argv.includes("--viewer")) {
+  require("./viewer").start(Number(arg("--port")) || 8377);
+  return;
+}
+
 function log(msg) { process.stderr.write(`[tokenbill] ${msg}\n`); }
 
 // ── HTTP ────────────────────────────────────────────────────
