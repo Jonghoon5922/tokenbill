@@ -310,7 +310,9 @@
         <div id="provList"></div>
       </section>
       <section class="card">
-        <h2>구독 연동 — 🖥️ MCP <span class="cnt" id="subCnt"></span></h2>
+        <h2>구독 연동 — 🖥️ MCP <span class="cnt" id="subCnt"></span>
+          <button class="btn ghost" id="viewerBtn" style="margin-left:auto;font-size:0.74rem;padding:4px 10px">🗂️ 대화 뷰어</button>
+        </h2>
         <div id="subProvList"></div>
       </section>
       <section class="card">
@@ -440,9 +442,10 @@
       gemini mcp add tokenbill -- npx -y github:Jonghoon5922/tokenbill --token 내토큰</p>
       <p><b>③ 끝 — 이후 자동</b> — CLI를 실행할 때마다 최근 60일 사용량이 자동 업로드됩니다.
       하나만 등록해도 PC의 세 CLI 기록을 전부 수집하며, AI에게 "내 토큰 순위 알려줘"라고 물으면 순위를 답해줍니다.</p>
-      <p><b>보너스 — 로컬 대화 뷰어</b>: <code>npx -y github:Jonghoon5922/tokenbill --viewer</code>를 실행하면
-      브라우저에서 세 CLI의 과거 대화(입력·출력·도구 호출)를 세션별로 열람·검색할 수 있습니다.
-      전부 내 PC 안에서만 읽으며 어떤 데이터도 업로드되지 않습니다.</p>
+      <p><b>보너스 — 로컬 대화 뷰어</b>: MCP를 연동해두면 Claude Code가 켜져 있는 동안
+      <b>구독 연동 카드의 [🗂️ 대화 뷰어] 버튼</b>으로 세 CLI의 과거 대화(입력·출력·도구 호출)를 열람·검색할 수 있습니다.
+      CLI가 꺼져 있을 땐 <code>npx -y github:Jonghoon5922/tokenbill --viewer</code>로 직접 실행하세요.
+      뷰어는 내 PC(127.0.0.1) 안에서만 로그를 읽으며 어떤 데이터도 업로드되지 않습니다.</p>
       <p>토큰이 유출된 것 같으면 마이페이지에서 <b>재발급</b>하세요 (이전 토큰 즉시 무효).
       구독 사용량은 본인 PC 로그 기반이라 프로바이더 표시에 🖥️가 붙고, 비용은 $0(정액 구독)으로 집계됩니다.
       해당 AI의 로그인 이메일은 <b>마스킹된 형태로만</b> 표시·보관되어(원본 미저장),
@@ -515,6 +518,7 @@
     "별명은 토큰 리더보드에 표시됩니다.": "Your nickname appears on the token leaderboard.",
     "구독 사용량 연동 (MCP)": "Subscription usage sync (MCP)",
     "회원 탈퇴": "Delete account",
+    "🗂️ 대화 뷰어": "🗂️ Transcripts",
     "— 계정·API 키·수집 데이터가 즉시 삭제됩니다": "— your account, API keys and all collected data are deleted immediately"
   };
 
@@ -551,9 +555,10 @@
     'gemini mcp add tokenbill -- npx -y github:Jonghoon5922/tokenbill --token YOUR_TOKEN</p>' +
     '<p><b>③ Done — automatic from here</b> — every time the CLI starts, the last 60 days of usage are uploaded. ' +
     'One registration collects logs from all three CLIs on your PC, and you can ask the AI "what\'s my token rank?" to get your rank.</p>' +
-    '<p><b>Bonus — local transcript viewer</b>: run <code>npx -y github:Jonghoon5922/tokenbill --viewer</code> to browse ' +
-    'and search past conversations (inputs, outputs, tool calls) from all three CLIs in your browser. ' +
-    'Everything is read locally on your PC — nothing is uploaded.</p>' +
+    '<p><b>Bonus — local transcript viewer</b>: with MCP set up, click <b>[🗂️ Transcripts] on the Subscriptions card</b> ' +
+    'while Claude Code is open to browse and search past conversations (inputs, outputs, tool calls) from all three CLIs. ' +
+    'If no CLI is running, start it manually with <code>npx -y github:Jonghoon5922/tokenbill --viewer</code>. ' +
+    'The viewer reads logs only on your PC (127.0.0.1) — nothing is uploaded.</p>' +
     '<p>If you think your token leaked, <b>reissue</b> it on My Page (the old one is revoked instantly). ' +
     'Subscription usage comes from logs on your own PC, is marked 🖥️, and is counted at $0 cost (flat-rate subscription). ' +
     'The AI account\'s login email is shown and stored <b>only in masked form</b> (the original is never stored), ' +
@@ -781,6 +786,20 @@
   $("dvTok").addEventListener("click", function () { dailyView = "tok"; render(); });
   $("lbApi").addEventListener("click", function () { lbTrack = "api"; render(); });
   $("lbSub").addEventListener("click", function () { lbTrack = "sub"; render(); });
+
+  // 로컬 대화 뷰어 — MCP 업로더가 내 PC에서 띄우는 127.0.0.1 서버를 연다 (서버는 대화를 볼 수 없음)
+  $("viewerBtn").addEventListener("click", function () {
+    var url = "http://127.0.0.1:8377";
+    var ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    var timer = ctl && setTimeout(function () { ctl.abort(); }, 1500);
+    fetch(url + "/api/ping", ctl ? { signal: ctl.signal } : {})
+      .then(function (r) { if (!r.ok) throw new Error(); clearTimeout(timer); window.open(url, "_blank", "noopener"); })
+      .catch(function () {
+        clearTimeout(timer);
+        toast(tr("로컬 뷰어가 꺼져 있어요 — Claude Code가 켜져 있으면 자동 실행됩니다. 수동 실행: npx -y github:Jonghoon5922/tokenbill --viewer",
+                 "Local viewer is not running — it starts automatically while Claude Code is open. Manual: npx -y github:Jonghoon5922/tokenbill --viewer"));
+      });
+  });
 
   function syncErrors(sync) {
     return (sync || []).filter(function (s) { return !s.ok; }).map(function (s) {

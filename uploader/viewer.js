@@ -325,11 +325,20 @@ function json(res, obj) {
   res.end(JSON.stringify(obj));
 }
 
-function start(port) {
+function start(port, opts) {
   port = port || 8377;
+  opts = opts || {};
   const server = http.createServer((req, res) => {
     const u = new URL(req.url, "http://127.0.0.1");
+    // DNS 리바인딩 방지 — 로컬 호스트명이 아닌 Host 헤더는 거부
+    const hostHdr = String(req.headers.host || "");
+    if (!/^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(hostHdr)) { res.writeHead(403); return res.end("forbidden"); }
     try {
+      if (u.pathname === "/api/ping") {
+        // 포탈(tokenbill.my)의 '뷰어 실행 중' 감지용 — 민감 정보 없음이라 CORS 허용
+        res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+        return res.end('{"ok":true,"app":"tokenbill-viewer"}');
+      }
       if (u.pathname === "/") {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         return res.end(PAGE);
@@ -353,12 +362,15 @@ function start(port) {
   });
   server.listen(port, "127.0.0.1", () => {
     const url = `http://127.0.0.1:${port}`;
-    process.stderr.write(`[tokenbill] 로컬 뷰어 실행 중: ${url}  (종료: Ctrl+C)\n`);
+    process.stderr.write(`[tokenbill] 로컬 뷰어 실행 중: ${url}\n`);
     process.stderr.write(`[tokenbill] 이 PC의 로그만 읽으며, 어떤 데이터도 외부로 전송하지 않습니다.\n`);
-    const opener = process.platform === "win32" ? `start "" "${url}"` : process.platform === "darwin" ? `open "${url}"` : `xdg-open "${url}"`;
-    try { require("child_process").exec(opener); } catch {}
+    if (opts.openBrowser !== false) {
+      const opener = process.platform === "win32" ? `start "" "${url}"` : process.platform === "darwin" ? `open "${url}"` : `xdg-open "${url}"`;
+      try { require("child_process").exec(opener); } catch {}
+    }
   });
   server.on("error", (e) => {
+    if (opts.silent) { process.stderr.write(`[tokenbill] 뷰어 자동 실행 생략: ${e.message}\n`); return; }
     process.stderr.write(`[tokenbill] 뷰어 시작 실패: ${e.message} (다른 포트: --port 8378)\n`);
     process.exit(1);
   });

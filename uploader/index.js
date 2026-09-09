@@ -277,6 +277,10 @@ async function handle(msg) {
 // 시작 시 1회 자동 업로드 (백그라운드)
 syncAll().then((r) => log("자동 동기화:\n" + r)).catch((e) => log("동기화 오류: " + e.message));
 
+// MCP로 떠 있는 동안 로컬 뷰어도 함께 서빙 — tokenbill.my의 '대화 뷰어' 버튼이 이 주소를 연다.
+// 127.0.0.1 전용이며 이미 다른 인스턴스가 포트를 쓰면 조용히 넘어간다.
+try { require("./viewer").start(8377, { openBrowser: false, silent: true }); } catch (e) { log("뷰어 자동 실행 생략: " + e.message); }
+
 const rl = readline.createInterface({ input: process.stdin, terminal: false });
 rl.on("line", (line) => {
   if (!line.trim()) return;
