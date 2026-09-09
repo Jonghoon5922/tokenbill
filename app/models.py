@@ -46,6 +46,16 @@ class ProviderKey(Base):
     __table_args__ = (UniqueConstraint("user_id", "provider", "label", name="uq_user_provider_label"),)
 
 
+class Announcement(Base):
+    """신규 기능 등 공지 팝업. active인 최신 1건만 사용자에게 노출된다."""
+    __tablename__ = "announcements"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(120))
+    body: Mapped[str] = mapped_column(String(4000))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class UsageDaily(Base):
     __tablename__ = "usage_daily"
     id: Mapped[int] = mapped_column(primary_key=True)

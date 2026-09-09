@@ -747,6 +747,39 @@ def admin_delete_user(user_id: int, admin: models.User = Depends(admin_user), db
     return {"ok": True}
 
 
+# ── 공지 팝업 ───────────────────────────────────────────────
+class AnnouncementIn(BaseModel):
+    title: str = Field(min_length=2, max_length=120)
+    body: str = Field(min_length=2, max_length=4000)
+
+
+@app.get("/api/announcement")
+def get_announcement(db: Session = Depends(get_db)):
+    """활성 공지 1건 (없으면 null). 로그인 후 팝업으로 1회 표시된다."""
+    a = db.query(models.Announcement).filter_by(active=True).order_by(models.Announcement.id.desc()).first()
+    if a is None:
+        return {"announcement": None}
+    return {"announcement": {"id": a.id, "title": a.title, "body": a.body,
+                             "created_at": a.created_at.isoformat() if a.created_at else None}}
+
+
+@app.post("/api/admin/announcement")
+def post_announcement(body: AnnouncementIn, admin: models.User = Depends(admin_user), db: Session = Depends(get_db)):
+    """새 공지 게시 — 이전 활성 공지는 자동으로 내려간다."""
+    db.query(models.Announcement).filter_by(active=True).update({"active": False})
+    a = models.Announcement(title=body.title.strip(), body=body.body.strip(), active=True)
+    db.add(a)
+    db.commit()
+    return {"ok": True, "id": a.id}
+
+
+@app.delete("/api/admin/announcement")
+def clear_announcement(admin: models.User = Depends(admin_user), db: Session = Depends(get_db)):
+    db.query(models.Announcement).filter_by(active=True).update({"active": False})
+    db.commit()
+    return {"ok": True}
+
+
 @app.post("/api/admin/sync-all")
 def admin_sync_all(admin: models.User = Depends(admin_user), db: Session = Depends(get_db)):
     """모든 사용자 즉시 재수집 (쿨다운 무시)."""
