@@ -443,7 +443,8 @@
       <p><b>③ 끝 — 이후 자동</b> — CLI를 실행할 때마다 최근 60일 사용량이 자동 업로드됩니다.
       하나만 등록해도 PC의 세 CLI 기록을 전부 수집하며, AI에게 "내 토큰 순위 알려줘"라고 물으면 순위를 답해줍니다.</p>
       <p><b>보너스 — 로컬 대화 뷰어</b>: MCP를 연동해두면 Claude Code가 켜져 있는 동안
-      <b>구독 연동 카드의 [🗂️ 대화 뷰어] 버튼</b>으로 세 CLI의 과거 대화(입력·출력·도구 호출)를 열람·검색할 수 있습니다.
+      <b>구독 연동 카드의 [🗂️ 대화 뷰어] 버튼</b>으로 과거 대화(입력·출력·도구 호출)를 열람·검색할 수 있습니다
+      — Claude Code·Codex·Gemini CLI에 <b>Cursor</b>까지 지원합니다.
       CLI가 꺼져 있을 땐 <code>npx -y github:Jonghoon5922/tokenbill --viewer</code>로 직접 실행하세요.
       뷰어는 내 PC(127.0.0.1) 안에서만 로그를 읽으며 어떤 데이터도 업로드되지 않습니다.</p>
       <p>토큰이 유출된 것 같으면 마이페이지에서 <b>재발급</b>하세요 (이전 토큰 즉시 무효).
@@ -556,7 +557,8 @@
     '<p><b>③ Done — automatic from here</b> — every time the CLI starts, the last 60 days of usage are uploaded. ' +
     'One registration collects logs from all three CLIs on your PC, and you can ask the AI "what\'s my token rank?" to get your rank.</p>' +
     '<p><b>Bonus — local transcript viewer</b>: with MCP set up, click <b>[🗂️ Transcripts] on the Subscriptions card</b> ' +
-    'while Claude Code is open to browse and search past conversations (inputs, outputs, tool calls) from all three CLIs. ' +
+    'while Claude Code is open to browse and search past conversations (inputs, outputs, tool calls) — ' +
+    'Claude Code, Codex, Gemini CLI and <b>Cursor</b> are supported. ' +
     'If no CLI is running, start it manually with <code>npx -y github:Jonghoon5922/tokenbill --viewer</code>. ' +
     'The viewer reads logs only on your PC (127.0.0.1) — nothing is uploaded.</p>' +
     '<p>If you think your token leaked, <b>reissue</b> it on My Page (the old one is revoked instantly). ' +

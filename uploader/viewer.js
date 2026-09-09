@@ -170,6 +170,82 @@ function parseGeminiSession(file, full) {
   return s.msgs || s.tokens ? s : null;
 }
 
+// ── Cursor 파서 (SQLite — Node 22.5+ 내장 node:sqlite 필요, 없으면 조용히 생략) ──
+let nodeSqlite = null;
+try { nodeSqlite = require("node:sqlite"); } catch {}
+function cursorDbPath() {
+  if (process.env.TOKENBILL_CURSOR_DB) return process.env.TOKENBILL_CURSOR_DB;  // 테스트용 오버라이드
+  if (process.platform === "win32") return path.join(process.env.APPDATA || "", "Cursor", "User", "globalStorage", "state.vscdb");
+  if (process.platform === "darwin") return path.join(os.homedir(), "Library", "Application Support", "Cursor", "User", "globalStorage", "state.vscdb");
+  return path.join(os.homedir(), ".config", "Cursor", "User", "globalStorage", "state.vscdb");
+}
+function cursorOpen() {
+  const p = cursorDbPath();
+  if (!nodeSqlite || !fs.existsSync(p)) return null;
+  try { return new nodeSqlite.DatabaseSync(p, { readOnly: true }); }
+  catch {
+    // Cursor 실행 중 잠금 대비 — 임시 복사본으로 열기
+    try {
+      const tmp = path.join(os.tmpdir(), "tokenbill-cursor.vscdb");
+      fs.copyFileSync(p, tmp);
+      try { fs.copyFileSync(p + "-wal", tmp + "-wal"); } catch {}
+      return new nodeSqlite.DatabaseSync(tmp, { readOnly: true });
+    } catch { return null; }
+  }
+}
+function cursorIso(ms) { return typeof ms === "number" && ms > 0 ? new Date(ms).toISOString() : ""; }
+function cursorSessions(full, onlyId) {
+  const db = cursorOpen();
+  if (!db) return [];
+  const out = [];
+  let rows = [];
+  try { rows = db.prepare("SELECT key, value FROM cursorDiskKV WHERE key LIKE 'composerData:%'").all(); } catch {}
+  let bubbleStmt = null;
+  try { bubbleStmt = db.prepare("SELECT value FROM cursorDiskKV WHERE key = ?"); } catch {}
+  for (const r of rows) {
+    let c;
+    try { c = JSON.parse(r.value); } catch { continue; }
+    const id = c.composerId || String(r.key).slice("composerData:".length);
+    if (onlyId && id !== onlyId) continue;
+    const s = { source: "cursor", file: "cursor:" + id, project: "", start: cursorIso(c.createdAt),
+                end: cursorIso(c.lastUpdatedAt || c.createdAt), msgs: 0, tokens: 0,
+                title: (c.name || "").slice(0, 80), model: "cursor", entries: [] };
+    // 구형: conversation 배열에 버블 인라인 / 신형: 헤더만 있고 버블은 bubbleId:* 키로 분리 저장
+    let bubbles = Array.isArray(c.conversation) ? c.conversation : [];
+    const headers = Array.isArray(c.fullConversationHeadersOnly) ? c.fullConversationHeadersOnly : [];
+    if (!bubbles.length && headers.length && bubbleStmt && (full || !s.title)) {
+      for (const h of headers) {
+        try {
+          const row = bubbleStmt.get("bubbleId:" + id + ":" + h.bubbleId);
+          if (row) { const b = JSON.parse(row.value); if (b.type === undefined) b.type = h.type; bubbles.push(b); }
+        } catch {}
+        if (!full && bubbles.length >= 3) break;  // 목록에서는 제목 추출용으로 앞부분만
+      }
+    }
+    for (const b of bubbles) {
+      if (!b) continue;
+      const text = typeof b.text === "string" ? b.text : "";
+      const tc = b.tokenCount;
+      if (tc) s.tokens += (tc.inputTokens || 0) + (tc.outputTokens || 0);
+      if (b.type === 1) {
+        s.msgs++;
+        if (!s.title && text) s.title = text.slice(0, 80).replace(/\s+/g, " ");
+        if (full && text) s.entries.push({ role: "user", time: cursorIso(b.createdAt) || s.start, text });
+      } else if (b.type === 2 && full && text) {
+        s.entries.push({ role: "assistant", time: cursorIso(b.createdAt) || s.start, model: (b.modelType || "cursor"), text });
+      }
+    }
+    if (!s.msgs && headers.length) s.msgs = headers.filter((h) => h && h.type === 1).length;
+    if (s.msgs) out.push(s);
+  }
+  try { db.close(); } catch {}
+  return out;
+}
+function cursorMeta(s) {
+  return { source: s.source, file: s.file, project: s.project, start: s.start, end: s.end,
+           msgs: s.msgs, tokens: s.tokens, title: s.title, model: s.model };
+}
+
 const PARSERS = { "claude-code": parseClaudeSession, "codex": parseCodexSession, "gemini": parseGeminiSession };
 const EXTS = { "claude-code": [".jsonl"], "codex": [".jsonl"], "gemini": [".json"] };
 
@@ -194,8 +270,19 @@ function listSessions() {
       if (m && m.msgs > 0) out.push(m);
     }
   }
+  try { cursorSessions(false).forEach((s) => out.push(cursorMeta(s))); } catch {}
   out.sort((a, b) => (b.start || "").localeCompare(a.start || ""));
   return out.slice(0, 500);
+}
+function grepSession(s, q, hits) {
+  for (const e of s.entries) {
+    if ((e.role !== "user" && e.role !== "assistant") || !e.text) continue;
+    const idx = e.text.toLowerCase().indexOf(q);
+    if (idx < 0) continue;
+    hits.push({ source: s.source, file: s.file, project: s.project, start: s.start, role: e.role, time: e.time,
+                snippet: e.text.slice(Math.max(0, idx - 60), idx + q.length + 120).replace(/\s+/g, " ") });
+    if (hits.length >= 50) return;
+  }
 }
 function searchSessions(q) {
   q = q.toLowerCase();
@@ -204,17 +291,15 @@ function searchSessions(q) {
     for (const file of walkFiles(BASES[source], EXTS[source])) {
       if (hits.length >= 50) return hits;
       const s = PARSERS[source](file, true);
-      if (!s) continue;
-      for (const e of s.entries) {
-        if ((e.role !== "user" && e.role !== "assistant") || !e.text) continue;
-        const idx = e.text.toLowerCase().indexOf(q);
-        if (idx < 0) continue;
-        hits.push({ source: s.source, file: s.file, project: s.project, start: s.start, role: e.role, time: e.time,
-                    snippet: e.text.slice(Math.max(0, idx - 60), idx + q.length + 120).replace(/\s+/g, " ") });
-        if (hits.length >= 50) break;
-      }
+      if (s) grepSession(s, q, hits);
     }
   }
+  try {
+    for (const s of cursorSessions(true)) {
+      if (hits.length >= 50) break;
+      grepSession(s, q, hits);
+    }
+  } catch {}
   return hits;
 }
 
@@ -260,7 +345,7 @@ main{flex:1;display:flex;min-height:0}
 <script>
 (function(){
 "use strict";
-var SRC={"claude-code":["Claude Code","var(--cc)"],"codex":["Codex","var(--codex)"],"gemini":["Gemini","var(--gem)"]};
+var SRC={"claude-code":["Claude Code","var(--cc)"],"codex":["Codex","var(--codex)"],"gemini":["Gemini","var(--gem)"],"cursor":["Cursor","#4f8f6b"]};
 var ROLE={user:"나",assistant:"AI",tool_use:"도구 호출",tool_result:"도구 결과",thinking:"생각"};
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
 function fmtTok(n){return n>=1e9?(n/1e9).toFixed(1)+"B":n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e3?Math.round(n/1e3)+"K":String(n)}
@@ -346,6 +431,9 @@ function start(port, opts) {
       if (u.pathname === "/api/sessions") return json(res, listSessions());
       if (u.pathname === "/api/session") {
         const file = u.searchParams.get("file") || "";
+        if (/^cursor:[A-Za-z0-9-]{1,64}$/.test(file)) {
+          return json(res, cursorSessions(true, file.slice(7))[0] || { entries: [] });
+        }
         if (!allowedFile(file)) { res.writeHead(403); return res.end("forbidden"); }
         const source = Object.keys(BASES).find((s) => path.resolve(file).startsWith(path.resolve(BASES[s]) + path.sep));
         const s = PARSERS[source](file, true);
