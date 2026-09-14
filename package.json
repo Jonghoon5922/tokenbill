@@ -1,10 +1,19 @@
 {
-  "name": "tokenbill-uploader",
-  "version": "0.1.0",
-  "description": "Tokenbill MCP — AI 구독(Claude Code·Codex CLI) 로컬 사용량을 tokenbill.my에 자동 업로드하고, 대화로 내 순위를 조회합니다.",
+  "name": "tokenbill-mcp",
+  "version": "1.0.0",
+  "description": "Tokenbill MCP — Claude Code·Codex·Gemini CLI 구독 토큰을 tokenbill.my 리더보드에 자동 집계하고, 로컬 대화 뷰어(--viewer)를 제공합니다. Auto-uploads your AI subscription token usage to the tokenbill.my leaderboard, with a local transcript viewer.",
   "bin": {
     "tokenbill-mcp": "./uploader/index.js"
   },
+  "files": [
+    "uploader/"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jonghoon5922/tokenbill.git"
+  },
+  "homepage": "https://tokenbill.my",
+  "keywords": ["mcp", "claude-code", "codex-cli", "gemini-cli", "cursor", "tokens", "leaderboard", "usage"],
   "engines": { "node": ">=18" },
   "license": "MIT"
 }

@@ -471,15 +471,15 @@
       <p><b>② 터미널에서 등록 명령 실행</b> — 마이페이지의 <b>[명령 복사]</b>를 눌러 붙여넣으면 끝.
       쓰는 CLI에 따라 명령 앞부분만 다릅니다:</p>
       <p style="font-family:ui-monospace,Consolas,monospace;font-size:0.76rem;background:var(--chip);padding:10px 12px;border-radius:8px;line-height:1.9">
-      claude mcp add tokenbill -- npx -y github:Jonghoon5922/tokenbill --token 내토큰<br>
-      codex&nbsp;&nbsp;mcp add tokenbill -- npx -y github:Jonghoon5922/tokenbill --token 내토큰<br>
-      gemini mcp add tokenbill -- npx -y github:Jonghoon5922/tokenbill --token 내토큰</p>
+      claude mcp add tokenbill -- npx -y tokenbill-mcp@latest --token 내토큰<br>
+      codex&nbsp;&nbsp;mcp add tokenbill -- npx -y tokenbill-mcp@latest --token 내토큰<br>
+      gemini mcp add tokenbill -- npx -y tokenbill-mcp@latest --token 내토큰</p>
       <p><b>③ 끝 — 이후 자동</b> — CLI를 실행할 때마다 최근 60일 사용량이 자동 업로드됩니다.
       하나만 등록해도 PC의 세 CLI 기록을 전부 수집하며, AI에게 "내 토큰 순위 알려줘"라고 물으면 순위를 답해줍니다.</p>
       <p><b>보너스 — 로컬 대화 뷰어</b>: MCP를 연동해두면 Claude Code가 켜져 있는 동안
       <b>구독 연동 카드의 [🗂️ 대화 뷰어] 버튼</b>으로 과거 대화(입력·출력·도구 호출)를 열람·검색할 수 있습니다
       — Claude Code·Codex·Gemini CLI에 <b>Cursor</b>까지 지원합니다.
-      CLI가 꺼져 있을 땐 <code>npx -y github:Jonghoon5922/tokenbill --viewer</code>로 직접 실행하세요.
+      CLI가 꺼져 있을 땐 <code>npx -y tokenbill-mcp@latest --viewer</code>로 직접 실행하세요.
       뷰어는 내 PC(127.0.0.1) 안에서만 로그를 읽으며 어떤 데이터도 업로드되지 않습니다.</p>
       <p>토큰이 유출된 것 같으면 마이페이지에서 <b>재발급</b>하세요 (이전 토큰 즉시 무효).
       구독 사용량은 본인 PC 로그 기반이라 프로바이더 표시에 🖥️가 붙고, 비용은 $0(정액 구독)으로 집계됩니다.
@@ -506,7 +506,7 @@
       <h3>방법 1 — Claude Code 켜기</h3>
       <p>MCP가 연동된 Claude Code(또는 Codex·Gemini CLI)를 실행하면 뷰어가 자동으로 함께 떠요. 켠 뒤 다시 눌러보세요.</p>
       <h3>방법 2 — 터미널에서 직접 실행</h3>
-      <p style="font-family:ui-monospace,Consolas,monospace;font-size:0.76rem;background:var(--chip);padding:10px 12px;border-radius:8px">npx -y github:Jonghoon5922/tokenbill --viewer</p>
+      <p style="font-family:ui-monospace,Consolas,monospace;font-size:0.76rem;background:var(--chip);padding:10px 12px;border-radius:8px">npx -y tokenbill-mcp@latest --viewer</p>
       <p class="chart-note">9월 초 이전에 연동했다면 구버전이 캐시되어 뷰어가 없을 수 있어요 — 그래도 안 되면 피드백으로 알려주세요.</p>
     </div>
     <a class="btn ghost" style="width:100%;margin-top:14px;text-align:center;text-decoration:none;display:block" href="http://127.0.0.1:8377" target="_blank" rel="noopener">그래도 열어보기</a>
@@ -620,15 +620,15 @@
     '<p><b>② Run the command in your terminal</b> — click <b>[Copy command]</b> on My Page and paste. ' +
     'Only the first word changes per CLI:</p>' +
     '<p style="font-family:ui-monospace,Consolas,monospace;font-size:0.76rem;background:var(--chip);padding:10px 12px;border-radius:8px;line-height:1.9">' +
-    'claude mcp add tokenbill -- npx -y github:Jonghoon5922/tokenbill --token YOUR_TOKEN<br>' +
-    'codex&nbsp;&nbsp;mcp add tokenbill -- npx -y github:Jonghoon5922/tokenbill --token YOUR_TOKEN<br>' +
-    'gemini mcp add tokenbill -- npx -y github:Jonghoon5922/tokenbill --token YOUR_TOKEN</p>' +
+    'claude mcp add tokenbill -- npx -y tokenbill-mcp@latest --token YOUR_TOKEN<br>' +
+    'codex&nbsp;&nbsp;mcp add tokenbill -- npx -y tokenbill-mcp@latest --token YOUR_TOKEN<br>' +
+    'gemini mcp add tokenbill -- npx -y tokenbill-mcp@latest --token YOUR_TOKEN</p>' +
     '<p><b>③ Done — automatic from here</b> — every time the CLI starts, the last 60 days of usage are uploaded. ' +
     'One registration collects logs from all three CLIs on your PC, and you can ask the AI "what\'s my token rank?" to get your rank.</p>' +
     '<p><b>Bonus — local transcript viewer</b>: with MCP set up, click <b>[🗂️ Transcripts] on the Subscriptions card</b> ' +
     'while Claude Code is open to browse and search past conversations (inputs, outputs, tool calls) — ' +
     'Claude Code, Codex, Gemini CLI and <b>Cursor</b> are supported. ' +
-    'If no CLI is running, start it manually with <code>npx -y github:Jonghoon5922/tokenbill --viewer</code>. ' +
+    'If no CLI is running, start it manually with <code>npx -y tokenbill-mcp@latest --viewer</code>. ' +
     'The viewer reads logs only on your PC (127.0.0.1) — nothing is uploaded.</p>' +
     '<p>If you think your token leaked, <b>reissue</b> it on My Page (the old one is revoked instantly). ' +
     'Subscription usage comes from logs on your own PC, is marked 🖥️, and is counted at $0 cost (flat-rate subscription). ' +
@@ -1066,7 +1066,7 @@
       box.innerHTML = '<button class="btn" onclick="tokenbill.issueUpToken()">' + tr("업로드 토큰 발급", "Issue upload token") + '</button>';
       return;
     }
-    var cmd = "claude mcp add tokenbill -- npx -y github:Jonghoon5922/tokenbill --token " + me.upload_token;
+    var cmd = "claude mcp add tokenbill -- npx -y tokenbill-mcp@latest --token " + me.upload_token;
     box.innerHTML =
       '<p class="chart-note" style="margin:0 0 4px">' + tr("Claude Code에서 아래 명령 한 줄만 실행하면 끝 (이후 자동 업로드):", "Run this one command for Claude Code — auto-uploads from then on:") + '</p>' +
       '<pre id="upCmd" style="background:var(--chip);padding:10px;border-radius:8px;font-size:0.7rem;overflow-x:auto;white-space:pre-wrap;word-break:break-all">' + esc(cmd) + '</pre>' +
@@ -1253,7 +1253,7 @@
                                 "Do either one below and your dashboard comes alive — you'll join the leaderboard too.");
     var s1;
     if (me.upload_token) {
-      var cmd = "claude mcp add tokenbill -- npx -y github:Jonghoon5922/tokenbill --token " + me.upload_token;
+      var cmd = "claude mcp add tokenbill -- npx -y tokenbill-mcp@latest --token " + me.upload_token;
       s1 = '<p>' + tr("터미널에 아래 한 줄을 붙여넣고, Claude Code를 새로 시작하면 끝이에요. (Codex·Gemini는 앞 단어만 codex/gemini로)",
                       "Paste this one line into your terminal, then restart Claude Code — done. (For Codex/Gemini just change the first word.)") + '</p>' +
         '<div class="ob-cmd" id="obCmd">' + esc(cmd) + '</div>' +

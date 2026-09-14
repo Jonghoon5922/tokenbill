@@ -1,7 +1,7 @@
 /**
  * Tokenbill 로컬 대화 뷰어
  *
- * `npx github:Jonghoon5922/tokenbill --viewer` 로 실행하면 127.0.0.1 전용 웹 뷰어가 뜬다.
+ * `npx -y tokenbill-mcp@latest --viewer` 로 실행하면 127.0.0.1 전용 웹 뷰어가 뜬다.
  * Claude Code·Codex·Gemini CLI의 로컬 로그를 읽어 세션별 대화(입력/출력/도구 호출)를 보여준다.
  * 어떤 데이터도 외부로 전송하지 않는다 — 전부 이 PC 안에서만 읽고 표시한다.
  */
