@@ -852,8 +852,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 _META_EN = {
     '<html lang="ko">': '<html lang="en">',
     "Tokenbill — 내 AI 토큰 대시보드": "Tokenbill — Your AI Token Dashboard",
-    "내 AI 토큰, 한 화면에서. Claude Code·Codex·Gemini 구독 토큰과 OpenAI·Anthropic API 사용량을 모아 리더보드에서 경쟁까지.":
-        "Your AI tokens, on one screen. Claude Code, Codex and Gemini subscription tokens plus OpenAI and Anthropic API usage — and a leaderboard to compete on.",
+    "내 AI 토큰, 한 화면에서. Claude Code·Codex·Gemini 사용량으로 겨루는 리더보드, 로컬 대화 뷰어·작업 보드, 로그가 증명하는 AI 이력서까지.":
+        "Your AI tokens, on one screen. A leaderboard for Claude Code · Codex · Gemini usage, a local transcript viewer and task board, and an AI résumé proven by your work logs.",
 }
 
 

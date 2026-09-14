@@ -1,7 +1,17 @@
-# Tokenbill (토큰빌) — AI API 비용 대시보드
+# Tokenbill (토큰빌) — 내 AI 토큰, 한 화면에서
 
-OpenAI·Anthropic API 사용 비용과 토큰을 한 화면에서 추적하는 서비스.
-FastAPI + SQLite + 바닐라 JS 프론트엔드(단일 HTML).
+AI는 쓰는 것으로 끝. 기록은 Tokenbill이 쌓고, 쌓인 기록은 실력이 됩니다.
+
+- 🏆 **리더보드** · 이번 달 얼마나 태웠나 — 6단계 티어, 월마다 새 판 (Claude Code·Codex·Gemini CLI·API)
+- 🗂️ **대화 뷰어** · 무슨 일을 했었나 — 지난 AI 대화를 한곳에서 검색 `local`
+- 📋 **작업 보드** · 지금 뭘 하고 있나 — AI 세션이 알아서 남기는 일감 기록 `local`
+- 📄 **AICV** · 그래서 뭘 할 수 있나 — 작업 로그가 증명하는 AI 활용 이력서 (aicv.tokenbill.my)
+
+설치는 명령 한 줄, 이후는 전자동. 대화 내용은 서버로 올라가지 않습니다.
+`local` 표시 기능은 내 PC(127.0.0.1)에서만 동작합니다.
+
+서비스: https://tokenbill.my · 로컬 도구: `npx -y tokenbill-mcp@latest`
+스택: FastAPI + SQLite + 바닐라 JS(단일 HTML) / 업로더·뷰어·보드: 의존성 0 Node.
 
 ## 실행 방법
 

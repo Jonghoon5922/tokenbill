@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tokenbill — 내 AI 토큰 대시보드</title>
-<meta name="description" content="내 AI 토큰, 한 화면에서. Claude Code·Codex·Gemini 구독 토큰과 OpenAI·Anthropic API 사용량을 모아 리더보드에서 경쟁까지.">
+<meta name="description" content="내 AI 토큰, 한 화면에서. Claude Code·Codex·Gemini 사용량으로 겨루는 리더보드, 로컬 대화 뷰어·작업 보드, 로그가 증명하는 AI 이력서까지.">
 <meta property="og:title" content="Tokenbill — 내 AI 토큰 대시보드">
-<meta property="og:description" content="내 AI 토큰, 한 화면에서. Claude Code·Codex·Gemini 구독 토큰과 OpenAI·Anthropic API 사용량을 모아 리더보드에서 경쟁까지.">
+<meta property="og:description" content="내 AI 토큰, 한 화면에서. Claude Code·Codex·Gemini 사용량으로 겨루는 리더보드, 로컬 대화 뷰어·작업 보드, 로그가 증명하는 AI 이력서까지.">
 <meta property="og:url" content="https://tokenbill.my">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://tokenbill.my/static/og.png">
@@ -160,6 +160,9 @@
   .ordiv::before, .ordiv::after { content: ""; flex: 1; border-top: 1px solid var(--grid); }
   #googleBtn { display: flex; justify-content: center; }
   #googleWrap.solo .ordiv { display: none; }
+  .feat-list { margin: -6px 0 20px; display: flex; flex-direction: column; gap: 7px; font-size: 0.8rem; color: var(--ink-2); }
+  .feat-list b { color: var(--ink); font-weight: 600; }
+  .feat-list .loc { font-size: 0.62rem; border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; color: var(--muted); vertical-align: 1px; }
   .lang-link { text-align: center; margin-top: 16px; }
   .lang-link a { color: var(--muted); font-size: 0.76rem; text-decoration: none; cursor: pointer; }
   .lang-link a:hover { color: var(--accent-ink); text-decoration: underline; }
@@ -201,6 +204,12 @@
   <div class="auth-card">
     <h1>Token<span class="won">bill</span></h1>
     <p class="tag">내 AI 토큰, 한 화면에서</p>
+    <div class="feat-list">
+      <div>🏆 <b>리더보드</b> <span>— 이번 달 얼마나 태웠나</span></div>
+      <div>🗂️ <b>대화 뷰어</b> <span>— 무슨 일을 했었나</span> <span class="loc">local</span></div>
+      <div>📋 <b>작업 보드</b> <span>— 지금 뭘 하고 있나</span> <span class="loc">local</span></div>
+      <div>📄 <b>AICV</b> <span>— 그래서 뭘 할 수 있나</span></div>
+    </div>
     <div class="auth-tabs hidden" id="authTabs">
       <button id="tabLogin" class="on">로그인</button>
       <button id="tabSignup">회원가입</button>
@@ -576,6 +585,11 @@
     "🏆 이번 달 토큰 리더보드": "🏆 This Month's Token Leaderboard",
     "지금 가입하고 순위에 도전해 보세요!": "Sign up now and claim your rank!",
     "환율": "FX rate", "월 예산 $": "Budget $/mo",
+    "리더보드": "Leaderboard", "대화 뷰어": "Transcripts", "작업 보드": "Task board",
+    "— 이번 달 얼마나 태웠나": "— how much you burned this month",
+    "— 무슨 일을 했었나": "— what you worked on",
+    "— 지금 뭘 하고 있나": "— what you're doing now",
+    "— 그래서 뭘 할 수 있나": "— and what you can prove",
     "마이페이지": "My Page", "가이드": "Guide", "피드백": "Feedback",
     "관리자": "Admin", "로그아웃": "Log out",
     "이번 달 토큰": "Tokens this month", "어제 토큰": "Tokens yesterday",
