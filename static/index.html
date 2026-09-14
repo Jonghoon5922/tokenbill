@@ -248,6 +248,11 @@
     </div>
   </header>
 
+  <div id="impBanner" class="hidden" style="display:flex;align-items:center;gap:10px;background:color-mix(in srgb,var(--warn) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--warn) 45%,var(--border));border-radius:9px;padding:9px 14px;margin-bottom:14px;font-size:0.84rem">
+    👁 <span><b id="impName"></b><span id="impTxt"> 계정 시점으로 보는 중입니다</span></span>
+    <button class="btn ghost" style="margin-left:auto" onclick="tokenbill.stopImpersonate()">관리자로 돌아가기</button>
+  </div>
+
   <div class="monthnav">
     <button class="btn ghost" id="mPrev" aria-label="이전 달">◀</button>
     <span id="mLabel"></span>
@@ -599,6 +604,8 @@
     "🗂️ 대화 뷰어": "🗂️ Transcripts",
     "📋 작업 보드": "📋 Task board",
     "확인했어요": "Got it",
+    "계정 시점으로 보는 중입니다": "— viewing as this user",
+    "관리자로 돌아가기": "Back to admin",
     "🗂️ 대화 뷰어가 응답하지 않아요": "🗂️ The transcript viewer isn't responding",
     "방법 1 — Claude Code 켜기": "Option 1 — Start Claude Code",
     "MCP가 연동된 Claude Code(또는 Codex·Gemini CLI)를 실행하면 뷰어가 자동으로 함께 떠요. 켠 뒤 다시 눌러보세요.": "With MCP set up, the viewer starts automatically while Claude Code (or Codex / Gemini CLI) is running. Start it, then click again.",
@@ -829,7 +836,9 @@
           '<td>' + fmtTok(u.month_tokens_api) + '</td>' +
           '<td>' + fmtTok(u.month_tokens_sub) + '</td>' +
           '<td>' + fmt(u.month_cost_usd) + '</td>' +
-          '<td>' + (u.is_admin ? '' : '<button class="btn ghost del" onclick="tokenbill.adminDelete(' + u.id + ', \'' + esc(u.email) + '\')">' + tr("삭제", "Delete") + '</button>') + '</td></tr>';
+          '<td>' + (u.is_admin ? '' :
+            '<button class="btn ghost del" onclick="tokenbill.impersonate(' + u.id + ')">' + tr("전환", "View as") + '</button> ' +
+            '<button class="btn ghost del" onclick="tokenbill.adminDelete(' + u.id + ', \'' + esc(u.email) + '\')">' + tr("삭제", "Delete") + '</button>') + '</td></tr>';
       }).join("");
   }
   $("adminBtn").addEventListener("click", showAdmin);
@@ -1117,6 +1126,27 @@
         .then(function () { toast(tr("탈퇴가 완료되었습니다. 이용해 주셔서 감사합니다.", "Your account has been deleted. Thanks for trying Tokenbill.")); tokenbill.closeMy(); logout(); })
         .catch(function (e) { toast(e.message); });
     },
+    impersonate: function (userId) {
+      api("/api/admin/impersonate/" + userId, { method: "POST" })
+        .then(function (r) {
+          try {
+            localStorage.setItem("tokenbill-admin-token", token);  // 복귀용 관리자 토큰 보관
+            localStorage.setItem("tokenbill-imp-name", r.nickname || "");
+            localStorage.setItem("tokenbill-token", r.token);
+          } catch (e) {}
+          location.href = "/";
+        })
+        .catch(function (e) { toast(e.message); });
+    },
+    stopImpersonate: function () {
+      try {
+        var adminTok = localStorage.getItem("tokenbill-admin-token");
+        if (adminTok) localStorage.setItem("tokenbill-token", adminTok);
+        localStorage.removeItem("tokenbill-admin-token");
+        localStorage.removeItem("tokenbill-imp-name");
+      } catch (e) {}
+      location.href = "/";
+    },
     adminDelete: function (userId, email) {
       if (!confirm(tr(email + " 계정과 모든 데이터를 삭제할까요?", "Delete " + email + " and all their data?"))) return;
       api("/api/admin/users/" + userId, { method: "DELETE" })
@@ -1224,6 +1254,11 @@
     if (document.activeElement !== $("fxRate")) $("fxRate").value = me.fx_rate;
     if (document.activeElement !== $("budget")) $("budget").value = me.budget_usd;
     $("adminBtn").classList.toggle("hidden", !me.is_admin);
+    // 관리자 임퍼소네이션 배너 — 복귀 토큰이 보관되어 있으면 표시
+    var impName = null;
+    try { impName = localStorage.getItem("tokenbill-admin-token") ? localStorage.getItem("tokenbill-imp-name") : null; } catch (e) {}
+    $("impBanner").classList.toggle("hidden", !impName);
+    if (impName) $("impName").textContent = impName;
     $("alertTestBtn").classList.toggle("hidden", !me.alerts_available);
 
     var connected = providers.filter(function (p) { return p.connected; }).map(function (p) { return p.provider; });

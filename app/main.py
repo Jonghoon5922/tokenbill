@@ -825,6 +825,15 @@ def clear_announcement(admin: models.User = Depends(admin_user), db: Session = D
     return {"ok": True}
 
 
+@app.post("/api/admin/impersonate/{user_id}")
+def admin_impersonate(user_id: int, admin: models.User = Depends(admin_user), db: Session = Depends(get_db)):
+    """관리자 → 해당 사용자 시점 전환용 토큰 발급 (지원·디버깅용)."""
+    target = db.get(models.User, user_id)
+    if target is None:
+        raise HTTPException(404, "사용자를 찾을 수 없습니다")
+    return {"token": create_token(target.id), "nickname": target.nickname or target.email}
+
+
 @app.post("/api/admin/sync-all")
 def admin_sync_all(admin: models.User = Depends(admin_user), db: Session = Depends(get_db)):
     """모든 사용자 즉시 재수집 (쿨다운 무시)."""
