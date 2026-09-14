@@ -1,6 +1,6 @@
 {
   "name": "tokenbill-mcp",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Tokenbill MCP — Claude Code·Codex·Gemini CLI 구독 토큰을 tokenbill.my 리더보드에 자동 집계하고, 로컬 대화 뷰어(--viewer)와 Duet 타스크 보드(127.0.0.1:8737)를 제공합니다. Auto-uploads your AI subscription token usage to the tokenbill.my leaderboard, with a local transcript viewer and the Duet task board.",
   "bin": {
     "tokenbill-mcp": "./uploader/index.js"

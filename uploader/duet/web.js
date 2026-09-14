@@ -51,6 +51,21 @@ function createApp(version) {
     const p = decodeURIComponent(u.pathname);
     const m = req.method;
 
+    // tokenbill.my 포탈의 '작업 보드 실행 중' 감지용 — 민감 정보 없음이라 CORS 허용 (PNA preflight 포함)
+    if (m === "OPTIONS") {
+      res.writeHead(204, {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+        "Access-Control-Allow-Private-Network": "true",
+      });
+      return res.end();
+    }
+    if (m === "GET" && p === "/api/ping") {
+      res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      return res.end('{"ok":true,"app":"duet-board"}');
+    }
+
     if (m === "GET" && p === "/") {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       return res.end(fs.readFileSync(PAGE, "utf8"));

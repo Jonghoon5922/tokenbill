@@ -245,6 +245,7 @@
       <input type="number" id="fxRate" min="1" step="10" aria-label="USD 대 KRW 환율">
       <label for="budget">월 예산 $</label>
       <input type="number" id="budget" min="0" step="10">
+      <a class="btn ghost" href="https://aicv.tokenbill.my" target="_blank" rel="noopener" style="text-decoration:none">📄 AICV</a>
       <button class="btn ghost" onclick="tokenbill.openMy()">마이페이지</button>
       <button class="btn ghost" onclick="tokenbill.openGuide()">가이드</button>
       <button class="btn ghost" onclick="tokenbill.openFb()">피드백</button>
@@ -330,8 +331,12 @@
       </section>
       <section class="card">
         <h2>구독 연동 — 🖥️ MCP <span class="cnt" id="subCnt"></span>
-          <a class="btn ghost" id="viewerBtn" href="http://127.0.0.1:8377" target="_blank" rel="noopener"
-             style="margin-left:auto;font-size:0.74rem;padding:4px 10px;text-decoration:none">🗂️ 대화 뷰어</a>
+          <span style="margin-left:auto;display:inline-flex;gap:6px">
+            <a class="btn ghost" id="viewerBtn" href="http://127.0.0.1:8377" target="_blank" rel="noopener"
+               style="font-size:0.74rem;padding:4px 10px;text-decoration:none">🗂️ 대화 뷰어</a>
+            <a class="btn ghost" id="duetBtn" href="http://127.0.0.1:8737" target="_blank" rel="noopener"
+               style="font-size:0.74rem;padding:4px 10px;text-decoration:none">📋 작업 보드</a>
+          </span>
         </h2>
         <div id="subProvList"></div>
       </section>
@@ -597,6 +602,7 @@
     "구독 사용량 연동 (MCP)": "Subscription usage sync (MCP)",
     "회원 탈퇴": "Delete account",
     "🗂️ 대화 뷰어": "🗂️ Transcripts",
+    "📋 작업 보드": "📋 Task board",
     "확인했어요": "Got it",
     "🗂️ 대화 뷰어가 응답하지 않아요": "🗂️ The transcript viewer isn't responding",
     "방법 1 — Claude Code 켜기": "Option 1 — Start Claude Code",
@@ -916,6 +922,25 @@
       .catch(function () { clearTimeout(timer); viewerAlive = false; if (cb) cb(false); });
   }
   $("viewerBtn").addEventListener("mouseenter", function () { pingViewer(); });
+  // 작업 보드(Duet)도 같은 패턴 — 살아있으면 링크 그대로, 아니면 안내 토스트
+  var duetAlive = null;
+  function pingDuet(cb) {
+    var ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    var timer = ctl && setTimeout(function () { ctl.abort(); }, 1500);
+    fetch("http://127.0.0.1:8737/api/ping", ctl ? { signal: ctl.signal } : {})
+      .then(function () { clearTimeout(timer); duetAlive = true; if (cb) cb(true); })
+      .catch(function () { clearTimeout(timer); duetAlive = false; if (cb) cb(false); });
+  }
+  $("duetBtn").addEventListener("mouseenter", function () { pingDuet(); });
+  $("duetBtn").addEventListener("click", function (ev) {
+    if (duetAlive === true) return;
+    ev.preventDefault();
+    pingDuet(function (ok) {
+      if (ok) window.open("http://127.0.0.1:8737", "_blank");
+      else toast(tr("작업 보드는 내 PC에서 실행돼요 — MCP가 연동된 Claude Code를 켜면 자동으로 뜹니다 (최신 버전 필요).",
+                    "The task board runs on your PC — start Claude Code with MCP set up and it launches automatically (latest version required)."));
+    });
+  });
   $("viewerBtn").addEventListener("click", function (ev) {
     if (viewerAlive === true) return;  // 확인됨 — 링크 그대로 새 탭
     ev.preventDefault();
