@@ -931,14 +931,11 @@
       .then(function () { clearTimeout(timer); duetAlive = true; if (cb) cb(true); })
       .catch(function () { clearTimeout(timer); duetAlive = false; if (cb) cb(false); });
   }
-  $("duetBtn").addEventListener("mouseenter", function () { pingDuet(); });
-  $("duetBtn").addEventListener("click", function (ev) {
-    if (duetAlive === true) return;
-    ev.preventDefault();
+  // 구버전 보드는 ping이 없어 '꺼짐'으로 오판될 수 있다 — 탐색은 막지 않고, 죽어 보일 때만 안내 토스트
+  $("duetBtn").addEventListener("click", function () {
     pingDuet(function (ok) {
-      if (ok) window.open("http://127.0.0.1:8737", "_blank");
-      else toast(tr("작업 보드는 내 PC에서 실행돼요 — MCP가 연동된 Claude Code를 켜면 자동으로 뜹니다 (최신 버전 필요).",
-                    "The task board runs on your PC — start Claude Code with MCP set up and it launches automatically (latest version required)."));
+      if (!ok) toast(tr("새 탭에 오류가 보이면 보드가 꺼진 거예요 — MCP가 연동된 Claude Code를 (재)시작하면 자동으로 뜹니다.",
+                        "If the new tab shows an error, the board isn't running — (re)start Claude Code with MCP set up and it launches automatically."));
     });
   });
   $("viewerBtn").addEventListener("click", function (ev) {
