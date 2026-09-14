@@ -30,6 +30,23 @@ http://localhost:8000 접속 → 회원가입 → 프로바이더 키 등록.
 
 API 문서: http://localhost:8000/docs (FastAPI 자동 생성)
 
+## MCP 업로더 + Duet 타스크 보드
+
+`npx -y tokenbill-mcp@latest` 하나가 Claude Code 창마다 붙어 세 가지를 한다:
+
+- **토큰 업로드** — 시작할 때와 `sync_usage` 도구로 로컬 로그를 tokenbill.my에 올린다.
+- **대화 뷰어** — http://127.0.0.1:8377 (이 PC의 로그만 읽는다).
+- **Duet 타스크 보드** — http://127.0.0.1:8737. 창에서 한 일이 타스크로 저절로 기록된다.
+  Claude가 `create_task`·`join_task`·`report_progress`·`complete_session` 등 도구 8개로 스스로 기록하고,
+  보드는 프로젝트(= 창을 연 폴더)별로 보여준다. 기록은 `~/.duet`에 파일로만 남고 서버로 올라가지 않는다.
+  규칙과 화면은 [Duet](https://github.com/Jonghoon5922/duet)(Python 판)과 같고 기록 형식도 같다 — `uploader/duet/`.
+
+```bash
+claude mcp add -s user tokenbill -- npx -y tokenbill-mcp@latest --token tbu_...
+npm test          # Duet 규칙 단위 테스트
+npm run smoke     # 진짜 stdio 프로세스 여러 개로 한 바퀴
+```
+
 ## 구조
 
 ```

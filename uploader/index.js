@@ -4,6 +4,7 @@
  *
  * - 시작 시 로컬 AI 사용 로그(~/.claude, ~/.codex)를 스캔해 tokenbill.my로 업로드
  * - MCP(stdio) 서버로 동작: sync_usage(수동 동기화), my_rank(내 순위 조회) 도구 제공
+ * - Duet(타스크 기록) 도구 8개와 보드(127.0.0.1:8737)를 함께 낸다 — uploader/duet/
  *
  * 등록 예:
  *   claude mcp add tokenbill -- npx -y tokenbill-mcp@latest --token tbu_...
@@ -248,26 +249,38 @@ const TOOLS = [
   { name: "my_rank", description: "Tokenbill 토큰 리더보드에서 내 이번 달 순위·티어·사용량을 조회합니다.", inputSchema: { type: "object", properties: {} } },
 ];
 
+// ── Duet: 이 프로세스가 세션 하나다. 기록은 ~/.duet 에 파일로. ──
+let duet = null, clientName = null;
+try { duet = require("./duet/server").start({ log }); } catch (e) { log("Duet 시작 실패: " + e.message); }
+
 function reply(id, result) { process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, result }) + "\n"); }
 function replyErr(id, code, message) { process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, error: { code, message } }) + "\n"); }
+
+function safeInstructions() { try { return duet.instructions(); } catch (e) { return "Duet 안내문을 만들지 못했다: " + e.message; } }
 
 async function handle(msg) {
   const { id, method, params } = msg;
   if (method === "initialize") {
+    clientName = params && params.clientInfo && params.clientInfo.name;
     return reply(id, {
       protocolVersion: (params && params.protocolVersion) || "2024-11-05",
       capabilities: { tools: {} },
       serverInfo: { name: "tokenbill", version: "0.1.0" },
+      ...(duet ? { instructions: safeInstructions() } : {}),
     });
   }
   if (method === "notifications/initialized" || (method && method.startsWith("notifications/"))) return;
   if (method === "ping") return reply(id, {});
-  if (method === "tools/list") return reply(id, { tools: TOOLS });
+  if (method === "tools/list") return reply(id, { tools: [...TOOLS, ...(duet ? duet.tools : [])] });
   if (method === "tools/call") {
     const name = params && params.name;
     let text;
     if (name === "sync_usage") text = await syncAll();
     else if (name === "my_rank") text = await myRank();
+    else if (duet && duet.has(name)) {
+      const out = duet.call(name, (params && params.arguments) || {}, clientName);
+      return reply(id, { content: [{ type: "text", text: JSON.stringify(out, null, 1) }], structuredContent: out });
+    }
     else return replyErr(id, -32602, `unknown tool: ${name}`);
     return reply(id, { content: [{ type: "text", text }] });
   }
@@ -288,4 +301,4 @@ rl.on("line", (line) => {
   try { msg = JSON.parse(line); } catch { return; }
   handle(msg).catch((e) => { if (msg.id !== undefined) replyErr(msg.id, -32603, e.message); });
 });
-rl.on("close", () => process.exit(0));
+rl.on("close", () => { if (duet) duet.close(); process.exit(0); });

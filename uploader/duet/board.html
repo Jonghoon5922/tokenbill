@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duet</title>
+<style>
+/* 웹폰트를 불러오지 않는다. 네트워크를 쓰지 않는 것이 이 도구의 원칙이라
+   설치돼 있는 글꼴만 쓴다 (Pretendard가 있으면 그것, 없으면 맑은 고딕). */
+:root{
+  --bg:#F3F4F7; --panel:#fff; --panel-2:#F8F9FB; --line:#DCDFE6; --line-2:#EBEDF2;
+  --ink:#171A21; --ink-2:#4C5261; --ink-3:#8A90A0;
+  --accent:#1F4E8C; --accent-ink:#fff;
+  --진행중:#2563B8; --진행중-bg:#E3ECFA;
+  --대기:#B7791F;   --대기-bg:#FBF0DA;
+  --중지:#6B7280;   --중지-bg:#ECEEF2;
+  --확인필요:#C2410C; --확인필요-bg:#FEE9DC;
+  --보류:#6B7280;   --보류-bg:#ECEEF2;
+  --완료:#1E7F4F;   --완료-bg:#DDF2E6;
+  --취소:#B42318;   --취소-bg:#FBE9E7;
+  --shadow:0 1px 2px rgba(23,26,33,.06), 0 4px 14px rgba(23,26,33,.06);
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#13161B; --panel:#1B1F26; --panel-2:#20252D; --line:#2E343E; --line-2:#272C35;
+    --ink:#ECEEF2; --ink-2:#AEB4C0; --ink-3:#737A88;
+    --accent:#7FA6E8; --accent-ink:#0F172A;
+    --진행중:#7FA6E8; --진행중-bg:#1C2A40;
+    --대기:#E2B25C;   --대기-bg:#3A2E15;
+    --중지:#A0A6B3;   --중지-bg:#2A2F38;
+    --확인필요:#F59E6B; --확인필요-bg:#3D2314;
+    --보류:#A0A6B3;   --보류-bg:#2A2F38;
+    --완료:#5FC98F;   --완료-bg:#16321F;
+    --취소:#F08A80;   --취소-bg:#3A1E1B;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.35);
+  }
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{
+  margin:0; background:var(--bg); color:var(--ink); font-size:14px; line-height:1.5;
+  font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.wrap{max-width:1180px;margin:0 auto;padding:28px 24px 80px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
+.sub{color:var(--ink-3);font-size:12.5px;margin-top:2px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--취소);display:inline-block;margin-right:4px}
+.pulse.on{background:var(--완료)}
+
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 12px;font-weight:500;font-size:13px}
+.btn:hover{background:var(--panel-2)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--ink-3);padding:3px 8px;font-size:11.5px}
+.btn.ghost:hover{background:var(--panel-2);color:var(--ink)}
+.btn.small{padding:4px 9px;font-size:12px}
+.btn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.acts{display:flex;gap:2px;align-items:center}
+
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 12px;font-size:12.5px;color:var(--ink-2);
+      display:inline-flex;gap:6px;align-items:center}
+.chip .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.chip .n{color:var(--ink-3)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip[aria-pressed="true"] .n{color:inherit;opacity:.7}
+.spacer{flex:1}
+.search{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 10px;min-width:220px}
+
+.grid{display:flex;flex-direction:column;gap:14px}
+.title{font-weight:600;font-size:15px;line-height:1.35;flex:1;min-width:0;overflow-wrap:break-word;word-break:keep-all;border-radius:4px;padding:0 3px;margin:0 -3px}
+.title[contenteditable]:hover{background:var(--panel-2)}
+.tid{color:var(--ink-3);font-weight:500;font-size:13px;padding-top:1px;flex:none}
+.desc{padding:0 16px 10px 30px}
+.desc div{color:var(--ink-2);font-size:12.5px;white-space:pre-wrap;border-radius:4px;padding:0 3px;margin:0 -3px}
+.desc div[contenteditable]:hover{background:var(--panel-2)}
+.desc div:empty::before{content:"No description";color:var(--ink-3)}
+.warn{padding:0 16px 12px 30px;color:var(--확인필요);font-size:12.5px}
+
+.sel{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:4px 24px 4px 8px;font-size:12.5px;
+     font-weight:500;appearance:none;-webkit-appearance:none;
+     background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);
+     background-position:calc(100% - 12px) 55%, calc(100% - 8px) 55%;background-size:4px 4px;background-repeat:no-repeat}
+.sel.s-진행중{color:var(--진행중);background-color:var(--진행중-bg);border-color:transparent}
+.sel.s-대기{color:var(--대기);background-color:var(--대기-bg);border-color:transparent}
+.sel.s-중지{color:var(--중지);background-color:var(--중지-bg);border-color:transparent}
+.sel.s-확인필요{color:var(--확인필요);background-color:var(--확인필요-bg);border-color:transparent}
+.sel.s-보류{color:var(--보류);background-color:var(--보류-bg);border-color:transparent}
+.sel.s-완료{color:var(--완료);background-color:var(--완료-bg);border-color:transparent}
+.sel.s-취소{color:var(--취소);background-color:var(--취소-bg);border-color:transparent}
+
+.sessions{border-top:1px solid var(--line-2)}
+.sess{border-bottom:1px solid var(--line-2)}
+.sess:last-child{border-bottom:0}
+.sess summary{display:grid;grid-template-columns:18px 1fr auto auto;gap:8px;align-items:center;padding:8px 12px 8px 16px;list-style:none}
+.sess summary::-webkit-details-marker{display:none}
+.sess summary:hover{background:var(--panel-2)}
+.sd{width:8px;height:8px;border-radius:50%;justify-self:center;background:var(--중지)}
+.sess.s-진행중 .sd{background:var(--진행중);box-shadow:0 0 0 3px var(--진행중-bg)}
+.sess.s-완료 .sd{background:var(--완료)}
+.nm{min-width:0;display:flex;flex-direction:column;line-height:1.3}
+.nm b{font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nm span{font-size:11px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.locked{font-size:10px;color:var(--ink-3)}
+.sess.s-완료 .nm b{color:var(--ink-3)}
+.tag{font-size:11px;padding:1px 7px;border-radius:999px;white-space:nowrap}
+.tag.s-진행중{color:var(--진행중);background:var(--진행중-bg)}
+.tag.s-완료{color:var(--완료);background:var(--완료-bg)}
+.tag.s-중지{color:var(--중지);background:var(--중지-bg)}
+.tag.s-확인필요{color:var(--확인필요);background:var(--확인필요-bg)}
+.tag.s-대기{color:var(--대기);background:var(--대기-bg)}
+.tag.s-보류{color:var(--보류);background:var(--보류-bg)}
+.tag.s-취소{color:var(--취소);background:var(--취소-bg)}
+.log{margin:0;padding:0 14px 12px 38px;list-style:none}
+.log li{display:flex;gap:8px;font-size:12.5px;color:var(--ink-2);margin-bottom:3px}
+.log time{color:var(--ink-3);font-size:11.5px;flex:none;padding-top:1px}
+.log .none{color:var(--ink-3)}
+.foot{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:7px 14px 7px 16px;
+      border-top:1px solid var(--line-2);font-size:11.5px;color:var(--ink-3)}
+.foot .mono{flex:none}
+.foot .acts{flex:none;margin-left:auto}
+.empty{text-align:center;padding:60px 20px;color:var(--ink-3);border:1px dashed var(--line);border-radius:var(--radius)}
+
+dialog{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:12px;padding:0;width:min(520px,92vw);box-shadow:var(--shadow)}
+dialog::backdrop{background:rgba(10,12,16,.45)}
+dialog form{padding:20px}
+dialog h2{margin:0 0 14px;font-size:16px}
+dialog .note{margin:-4px 0 12px;font-size:12px;color:var(--ink-3)}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.field label{font-size:12px;color:var(--ink-2);font-weight:500}
+.field input,.field textarea{border:1px solid var(--line);background:var(--panel-2);border-radius:8px;padding:8px 10px}
+.field textarea{min-height:80px;resize:vertical}
+.actions{display:flex;justify-content:flex-end;gap:8px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);
+       padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+@media (max-width:640px){.wrap{padding:18px 14px 60px}}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+/* 프로젝트 상자 */
+.pcard{background:var(--panel);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.phead{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--line-2);background:var(--panel-2);cursor:pointer;user-select:none}
+.phead:hover{background:var(--line-2)}
+.phead h2{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+.phead h2 .caret{display:inline-block;font-size:10px;color:var(--ink-3);transition:transform .15s}
+.pcard.folded .phead{border-bottom:0}
+.pcard.folded .phead h2 .caret{transform:rotate(-90deg)}
+.pcard.folded .trows,.pcard.folded .pempty{display:none}
+.pc{font-size:12px;color:var(--ink-3)}
+.pempty{padding:14px 16px;color:var(--ink-3);font-size:12.5px}
+
+/* 타스크 줄 */
+.trow{border-bottom:1px solid var(--line-2)}
+.trow:last-child{border-bottom:0}
+.trow summary{display:flex;align-items:center;gap:10px;padding:9px 16px 9px 12px;list-style:none;cursor:pointer}
+.trow summary::-webkit-details-marker{display:none}
+.trow summary:hover{background:var(--panel-2)}
+.trow .stripe{width:4px;height:22px;margin:0;border-radius:2px;flex:none}
+.trow .title{font-size:14px;line-height:1.3}
+.trow.s-완료 .title,.trow.s-취소 .title{color:var(--ink-3)}
+.warn-dot{color:var(--확인필요);flex:none}
+.tbody{padding:6px 16px 10px 30px;background:var(--bg)}
+.tbody .desc,.tbody .warn,.tbody .foot{padding-left:0;padding-right:0}
+.tbody .sessions{background:var(--panel);border:1px solid var(--line-2);border-radius:8px;margin-bottom:8px}
+.tbody .foot{border-top:0;padding-top:2px}
+.lock{border:0;background:none;padding:0 2px;font-size:12px;cursor:pointer;line-height:1}
+.lock:hover{filter:brightness(1.2)}
+.x{border:0;background:none;color:var(--ink-3);font-size:16px;line-height:1;padding:0 6px;cursor:pointer;border-radius:4px}
+.x:hover{color:var(--취소);background:var(--취소-bg)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Duet</h1>
+      <div class="sub"><span class="pulse" id="pulse"></span><span id="state">Connecting…</span></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="feedback" title="Report a bug or suggest something — opens a GitHub issue">Feedback</button>
+      <button class="btn" id="archive" aria-pressed="false">Archived</button>
+      <button class="btn primary" id="new">+ New Project</button>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="chips" id="chips"></div>
+    <div class="spacer"></div>
+    <input class="search" id="q" type="search" placeholder="Search">
+  </div>
+
+  <div class="grid" id="grid"></div>
+</div>
+
+<!-- 새 프로젝트. 프로젝트는 첫 타스크와 함께 태어난다 — 빈 상자를 만들지 않는다. -->
+<dialog id="dlgProject">
+  <form id="frmProject">
+    <h2>New Project</h2>
+    <div class="field"><label for="pName">Project name</label><input id="pName" required placeholder="e.g. nefss" autocomplete="off"></div>
+    <div class="field"><label for="pTitle">First task</label><input id="pTitle" required placeholder="e.g. pc101pm 전환"></div>
+    <div class="field"><label for="pDesc">Description (optional)</label><textarea id="pDesc" placeholder="What this task is about"></textarea></div>
+    <div class="actions">
+      <button type="button" class="btn" id="pCancel">Cancel</button>
+      <button type="submit" class="btn primary">Create</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- 프로젝트 상자 안의 새 타스크 -->
+<dialog id="dlgTask">
+  <form id="frmTask">
+    <h2 id="tHead">New Task</h2>
+    <div class="field"><label for="tTitle">Title</label><input id="tTitle" required placeholder="e.g. pc101pm 전환"></div>
+    <div class="field"><label for="tDesc">Description (optional)</label><textarea id="tDesc" placeholder="What this task is about"></textarea></div>
+    <div class="actions">
+      <button type="button" class="btn" id="tCancel">Cancel</button>
+      <button type="submit" class="btn primary">Create</button>
+    </div>
+  </form>
+</dialog>
+<!-- 피드백 = GitHub 이슈. 여기서 적은 글을 새 이슈 화면에 채워서 연다. 보내는 것은 브라우저다. -->
+<dialog id="dlgFeedback">
+  <form id="frmFeedback">
+    <h2>Feedback</h2>
+    <div class="field"><label for="fbTitle">Title</label><input id="fbTitle" required placeholder="What's wrong, or what would help"></div>
+    <div class="field"><label for="fbBody">Details (optional)</label><textarea id="fbBody" placeholder="What you did, what you expected, what happened"></textarea></div>
+    <p class="note">Opens a new GitHub issue with this filled in. You submit it there.</p>
+    <div class="actions">
+      <button type="button" class="btn" id="fbCancel">Cancel</button>
+      <button type="submit" class="btn primary">Open issue</button>
+    </div>
+  </form>
+</dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+// 파일과 도구는 한글 상태 이름을 쓴다 (Claude가 보고하는 말이다). 화면에서만 영문으로 보여준다.
+const STATUSES = ["대기", "진행중", "확인 필요", "완료", "보류", "취소"];
+const LABEL = { "대기": "Waiting", "진행중": "Running", "확인 필요": "Needs review",
+                "완료": "Done", "보류": "On hold", "취소": "Cancelled", "중지": "Stopped" };
+const label = (st) => LABEL[st] || st;
+// 사람이 고를 수 있는 것은 셋 — 끝났다, 잠시 둔다, 안 한다. 대기·진행중·확인 필요는 세션이
+// 없느냐 살아 있느냐 끊겼느냐는 사실이지 고르는 게 아니다. 되돌리려면 🔒를 푼다.
+const HUMAN = ["완료", "보류", "취소"];
+const UNSORTED = "_미분류";   // 프로젝트를 모르는 타스크가 모이는 폴더 이름. 주소에도 이렇게 쓴다
+const ALL = "*";
+// CSS 클래스·변수 이름에는 띄어쓰기를 못 넣는다.
+const slug = (st) => st.replace(/\s+/g, "");
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+let tasks = [];
+let projects = [];      // 타스크가 없는 프로젝트 폴더도 상자로 뜬다
+let filter = ALL;
+let query = "";
+let archived = false;   // 보관함을 보고 있나
+let drawn = null;       // 마지막으로 그린 내용. 같으면 다시 그리지 않는다.
+const opened = new Set();  // 펼쳐 둔 타스크 ref·세션 id
+// 접어 둔 프로젝트. 새로고침해도 접힌 채로 — 화면 코드가 바뀌면 탭이 스스로 다시 뜨기 때문에 브라우저에 둔다.
+const folded = new Set((() => { try { return JSON.parse(localStorage.getItem("duet.folded") || "[]"); } catch (_) { return []; } })());
+const rememberFolded = () => { try { localStorage.setItem("duet.folded", JSON.stringify([...folded])); } catch (_) {} };
+let newTaskProject = "";   // 새 타스크 대화상자가 열린 프로젝트
+let about = { version: "", repo: "", projects: 0 };  // 피드백 본문 끝에 붙일 것
+let page = null;   // 이 탭이 처음 받은 화면 도장. 서버 것이 달라지면 화면 코드가 바뀐 것이다
+
+const $ = (s) => document.querySelector(s);
+const el = (tag, props = {}, ...kids) => {
+  const node = Object.assign(document.createElement(tag), props);
+  for (const kid of kids.flat(2)) if (kid != null) node.append(kid);
+  return node;
+};
+const when = (stamp) => stamp ? stamp.replace("T", " ").split(".")[0].slice(5) : "";
+const JSON_HEADERS = { "content-type": "application/json" };
+
+async function api(path, options) {
+  const res = await fetch(path, options);
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+  return res.json();
+}
+const post = (path, body) => api(path, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(body ?? {}) });
+
+let toastTimer;
+function toast(message) {
+  const node = $("#toast");
+  node.textContent = message;
+  node.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => node.classList.remove("show"), 2600);
+}
+
+/* ---------- 타스크 줄 ---------- */
+
+// 살아 있는 세션이 붙어 있는 타스크. 그 창이 일하는 중이라 사람은 손대지 않는다 —
+// 상태는 그 세션이 끝나면 저절로 바뀌고, 제목·설명도 세션이 끝난 뒤에 고친다.
+const busyTask = (task) => task.counts["진행중"] > 0;
+
+function statusSelect(task) {
+  if (busyTask(task)) {
+    return el("span", { className: `tag s-${slug(task.status)}`, textContent: label(task.status),
+      title: "A session is working on this. The status updates itself when it finishes." });
+  }
+  // PMS답게 지금 상태만 보여준다. 고르면 그것이 상태가 된다 (= task.md의 `상태:` 줄).
+  const sel = el("select", { className: `sel s-${slug(task.status)}`,
+    title: "Pick a status to pin it (🔒). Otherwise it follows the sessions." });
+  if (!HUMAN.includes(task.status)) {
+    sel.append(el("option", { value: "", textContent: label(task.status), selected: true, disabled: true }));
+  }
+  for (const st of HUMAN) {
+    sel.append(el("option", { value: st, textContent: label(st), selected: task.status === st }));
+  }
+  sel.onchange = async () => {
+    try {
+      await post(`/api/tasks/${task.ref}/status`, { status: sel.value });
+      toast(`${task.id} → ${label(sel.value)}`);
+      refresh(true);
+    } catch (e) { toast(e.message); }
+  };
+  return sel;
+}
+
+// 사람이 정해 둔 상태에 붙는 자물쇠. 누르면 그 줄을 지워 다시 세션에서 센다.
+function unlockButton(task) {
+  if (!task.override) return null;
+  const button = el("button", {
+    className: "lock", type: "button", textContent: "🔒",
+    title: "Pinned by you. Sessions won't change it. Click to let it follow the sessions again.",
+  });
+  button.onclick = async (e) => {
+    e.stopPropagation();
+    try {
+      await post(`/api/tasks/${task.ref}/status`, { status: null });
+      toast(`${task.id} unpinned`);
+      refresh(true);
+    } catch (err) { toast(err.message); }
+  };
+  return button;
+}
+
+// 제목·설명 인라인 편집. 포커스를 잃을 때만 보낸다.
+function editable(task, field, text, className) {
+  if (busyTask(task)) {
+    return el("div", { className, textContent: text, title: "Locked while a session is working on it." });
+  }
+  const node = el("div", { className, contentEditable: "true", spellcheck: false, textContent: text });
+  node.dataset.editing = "";
+  node.onfocus = () => { node.dataset.editing = "1"; };
+  node.onkeydown = (e) => {
+    if (e.key === "Enter" && field === "title") { e.preventDefault(); node.blur(); }
+    if (e.key === "Escape") { node.textContent = text; node.blur(); }
+  };
+  node.onblur = async () => {
+    node.dataset.editing = "";
+    const value = node.textContent.trim();
+    if (value === text) return;
+    if (field === "title" && !value) { node.textContent = text; return; }
+    try {
+      await api(`/api/tasks/${task.ref}`, { method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify({ [field]: value }) });
+      toast(`${task.id} ${field} updated`);
+      refresh(true);
+    } catch (e) { toast(e.message); node.textContent = text; }
+  };
+  return node;
+}
+
+// 끝난 세션만 사람이 바꾼다. 살아 있는 세션은 그 프로세스가 자기 파일의 주인이라
+// 태그만 보여주고 손대지 못하게 한다.
+function sessionControl(task, s) {
+  if (s.alive) return el("span", { className: `tag s-${s.status}`, textContent: label(s.status) });
+
+  const sel = el("select", { className: `sel s-${s.status}`, title: "Count this stopped session as done?" });
+  for (const v of ["완료", "중지"]) {
+    sel.append(el("option", { value: v, textContent: label(v), selected: s.status === v }));
+  }
+  sel.onclick = (e) => e.stopPropagation();
+  sel.onchange = async (e) => {
+    e.stopPropagation();
+    try {
+      await post(`/api/tasks/${task.ref}/sessions/${s.id}/status`, { status: sel.value });
+      toast(`${s.title || s.id} → ${label(sel.value)}`);
+      refresh(true);
+    } catch (err) { toast(err.message); refresh(true); }
+  };
+  return sel;
+}
+
+function sessionRow(task, s) {
+  const logs = s.progress.map((p) => el("li", {},
+    el("time", { className: "mono", textContent: when(p.t) }),
+    el("span", { textContent: p.msg + (p.pct != null ? ` (${p.pct}%)` : "") })));
+  if (s.summary) {
+    logs.push(el("li", {},
+      el("time", { className: "mono", textContent: "→" }),
+      el("span", { style: `color:var(--${s.status})`, textContent: s.summary })));
+  }
+
+  // 펼쳐 둔 세션은 다시 그려도 펼쳐진 채로. 살아 있는 세션은 30초마다 하트비트를
+  // 쓰므로, 기억해 두지 않으면 로그를 읽는 중에 접힌다.
+  const row = el("details", { className: `sess s-${s.status}`, open: opened.has(s.id) },
+    el("summary", {},
+      el("span", { className: "sd" }),
+      el("span", { className: "nm" },
+        el("b", { textContent: s.title || s.id }),
+        el("span", { textContent: `${s.client} · ${s.alive ? "working" : when(s.heartbeat)}` })),
+      s.by_human ? el("span", { className: "locked", title: "Set by you", textContent: "🔒" }) : null,
+      sessionControl(task, s)),
+    el("ul", { className: "log" },
+      logs.length ? logs : el("li", { className: "none" }, "No progress reported yet")));
+  row.ontoggle = () => { row.open ? opened.add(s.id) : opened.delete(s.id); };
+  return row;
+}
+
+function ghost(label, onclick) {
+  return el("button", { className: "btn ghost", type: "button", textContent: label, onclick });
+}
+
+// 타스크 한 줄. 누르면 설명·세션이 펼쳐진다.
+function taskRow(task) {
+  const total = task.sessions.length;
+
+  // summary 안의 편집 칸·드롭다운은 누를 때 펼침이 같이 토글되지 않게 막는다.
+  const title = editable(task, "title", task.title, "title");
+  title.onclick = (e) => e.stopPropagation();
+  const sel = statusSelect(task);
+  sel.onclick = (e) => e.stopPropagation();
+
+  const row = el("details", { className: `trow s-${slug(task.status)}`, open: opened.has(task.ref) },
+    el("summary", {},
+      el("span", { className: "stripe", style: `background:var(--${slug(task.status)})` }),
+      el("span", { className: "tid mono", textContent: task.id }),
+      title,
+      task.warning ? el("span", { className: "warn-dot", title: task.warning, textContent: "⚠" }) : null,
+      sel,
+      unlockButton(task),
+      busyTask(task) || archived ? null : xButton("Delete task", () => deleteTask(task))),
+    el("div", { className: "tbody" },
+      el("div", { className: "desc" }, editable(task, "description", task.description, "")),
+      task.warning ? el("div", { className: "warn", textContent: `⚠ ${task.warning}` }) : null,
+      total ? el("div", { className: "sessions" }, task.sessions.map((s) => sessionRow(task, s))) : null,
+      el("div", { className: "foot" },
+        el("span", { className: "mono", title: task.folder, textContent: task.ref }),
+        task.last_activity
+          ? el("span", { className: "mono", textContent: `Last activity ${when(task.last_activity)}` })
+          : null,
+        el("span", { className: "acts" }, ghost("▲ Collapse", () => { row.open = false; })))));
+  row.ontoggle = () => { row.open ? opened.add(task.ref) : opened.delete(task.ref); };
+  return row;
+}
+
+// 지우는 손잡이는 × 하나. 살아 있는 세션이 붙어 있으면 서버가 거절한다.
+function xButton(title, onclick) {
+  const b = el("button", { className: "x", type: "button", textContent: "×", title });
+  b.onclick = (e) => { e.stopPropagation(); e.preventDefault(); onclick(); };
+  return b;
+}
+
+async function remove(path, message) {
+  if (!confirm(message)) return;
+  try {
+    const res = await api(path, { method: "DELETE" });
+    toast(res.note);
+    refresh(true);
+  } catch (e) { toast(e.message); }
+}
+const deleteTask = (task) =>
+  remove(`/api/tasks/${task.ref}`, `[${task.ref}] ${task.title}\nDelete this task and its session history? This cannot be undone.`);
+const deleteProject = (name, count) =>
+  remove(`/api/projects/${name || UNSORTED}`, `Delete project '${name || UNSORTED}' and its ${plural(count, "task")}? This cannot be undone.`);
+
+/* ---------- 프로젝트 상자 ---------- */
+
+async function act(path, body, fallback) {
+  try {
+    const res = await post(path, body);
+    toast(res.note || fallback);
+    refresh(true);
+  } catch (e) { toast(e.message); }
+}
+
+function projectButtons(name, list) {
+  if (archived) {
+    return [el("button", { className: "btn small", type: "button", textContent: "Unarchive",
+      onclick: () => act("/api/projects/unarchive", { name }, "Restored") })];
+  }
+  const out = [el("button", { className: "btn small", type: "button", textContent: "+ Task",
+    onclick: () => openTaskDialog(name) })];
+  // 살아 있는 세션이 있으면 서버가 거절한다. 여기서는 미리 숨기지 않고 이유를 토스트로 보여준다.
+  out.push(el("button", { className: "btn small", type: "button", textContent: "Archive",
+    title: "Move the whole project folder to the archive. Nothing is deleted.",
+    onclick: () => act("/api/projects/archive", { name }, "Archived") }));
+  out.push(xButton("Delete project", () => deleteProject(name, list.length)));
+  return out;
+}
+
+// 프로젝트 하나가 상자 하나. 그 안에 타스크가 줄로 들어간다.
+function projectCard(name, list) {
+  const running = list.filter((t) => t.status === "진행중").length;
+  const attention = list.filter((t) => t.status === "확인 필요").length;
+  const key = name || UNSORTED;
+  const head = el("div", { className: "phead", title: "Click to fold or unfold" },
+      el("h2", {}, el("span", { className: "caret", textContent: "▼" }), el("span", { textContent: key })),
+      el("span", { className: "spacer" }),
+      running ? el("span", { className: "tag s-진행중", textContent: `${running} running` }) : null,
+      attention ? el("span", { className: "tag s-확인필요", textContent: `${attention} needs review` }) : null,
+      el("span", { className: "pc mono", textContent: plural(list.length, "task") }),
+      el("span", { className: "acts" }, projectButtons(name, list)));
+  const card = el("article", { className: "pcard" + (folded.has(key) ? " folded" : "") },
+    head,
+    list.length
+      ? el("div", { className: "trows" }, list.map(taskRow))
+      : el("div", { className: "pempty", textContent: "No tasks yet. Add one with + Task." }));
+  // 머리 아무 데나 누르면 접힌다. 버튼(+ Task·Archive·×)은 자기 일만 한다.
+  head.onclick = (e) => {
+    if (e.target.closest("button")) return;
+    card.classList.toggle("folded");
+    card.classList.contains("folded") ? folded.add(key) : folded.delete(key);
+    rememberFolded();
+  };
+  return card;
+}
+
+/* ---------- 그리기 ---------- */
+
+function tally() {
+  const c = { [ALL]: tasks.length };
+  for (const st of STATUSES) c[st] = 0;
+  for (const t of tasks) c[t.status] = (c[t.status] || 0) + 1;
+  return c;
+}
+
+function draw() {
+  const c = tally();
+  const pick = (key) => { filter = filter === key ? ALL : key; drawn = null; draw(); };
+
+  // 상태 칩이 곧 필터다. 하나 누르면 그것만, 다시 누르면 전부.
+  $("#chips").replaceChildren(...[ALL, ...STATUSES].map((s) => {
+    const chip = el("button", { className: "chip" },
+      s === ALL ? null : el("span", { className: "dot", style: `background:var(--${slug(s)})` }),
+      el("span", { textContent: s === ALL ? "All" : label(s) }),
+      el("span", { className: "n mono", textContent: String(c[s]) }));
+    chip.setAttribute("aria-pressed", String(filter === s));
+    chip.onclick = () => pick(s);
+    return chip;
+  }));
+
+  const q = query.trim().toLowerCase();
+  const hit = (t) => !q || [t.id, t.title, t.description, t.project,
+    ...t.sessions.flatMap((s) => [s.title, s.client, s.summary || "", ...s.progress.map((p) => p.msg)]),
+  ].some((text) => String(text).toLowerCase().includes(q));
+  const shown = tasks.filter((t) => (filter === ALL || t.status === filter) && hit(t));
+
+  // 프로젝트별로 묶는다. 모르는 것은 맨 아래.
+  const groups = new Map();
+  const filtering = filter !== ALL || q;
+  if (!filtering) for (const p of projects) groups.set(p, []);  // 빈 프로젝트도 상자로
+  for (const t of shown) {
+    const key = t.project || "";
+    (groups.get(key) ?? groups.set(key, []).get(key)).push(t);
+  }
+  for (const list of groups.values()) list.sort((a, b) => a.id.localeCompare(b.id));
+  // 프로젝트는 최근에 움직인 것이 위.
+  const latest = (key) => Math.max(0, ...groups.get(key).map((t) => Date.parse(t.last_activity) || 0));
+  const order = [...groups.keys()].sort((a, b) => {
+    if (!a) return 1;
+    if (!b) return -1;
+    return (latest(b) - latest(a)) || a.localeCompare(b, "ko");
+  });
+  const cards = order.map((key) => projectCard(key, groups.get(key)));
+
+  $("#grid").replaceChildren(...(cards.length ? cards : [
+    el("div", { className: "empty", textContent: tasks.length
+      ? "No tasks match."
+      : archived ? "The archive is empty." : "No projects yet. Start with + New Project." }),
+  ]));
+}
+
+/* ---------- 새로 읽기 ---------- */
+
+function busy() {
+  // 고치는 중이거나 드롭다운을 만지는 중이면 다시 그리지 않는다. 커서가 사라진다.
+  const active = document.activeElement;
+  return !!active && (active.dataset?.editing === "1" || active.tagName === "SELECT");
+}
+
+async function refresh(force = false) {
+  try {
+    const data = await api(archived ? "/api/archive" : "/api/tasks");
+    const count = archived ? new Set(data.tasks.map((t) => t.project)).size : (data.projects || []).length;
+    // 재설치로 화면 파일이 바뀌었다. 데이터는 매번 새로 읽지만 화면 코드는 탭이 들고 있으므로
+    // 여기서 한 번 스스로 새로고침한다. 편집 중이면 그 입력이 날아가니 끝날 때까지 미룬다.
+    if (page === null) page = data.page;
+    else if (data.page && data.page !== page && !busy()) { location.reload(); return; }
+    $("#pulse").classList.add("on");
+    $("#pulse").title = data.home;
+    about = { version: data.version || "", repo: data.repo || "", projects: count };  // 경로는 볼 일이 드물다. 점에 마우스를 올리면 나온다
+    $("#state").textContent = `${archived ? "Archive" : "Live"} · ${plural(count, "project")} · ${plural(data.tasks.length, "task")}`;
+    // 보관함 안에서는 같은 버튼이 "돌아가기"다. 토글이라는 걸 사람이 알 필요 없다.
+    $("#archive").textContent = archived ? "← Board" : (data.archived ? `Archived ${data.archived}` : "Archived");
+
+    const shape = JSON.stringify([archived, data.projects, data.tasks]);
+    if (!force && (busy() || shape === drawn)) return;
+    drawn = shape;
+    tasks = data.tasks;
+    projects = data.projects || [];
+    draw();
+  } catch (e) {
+    $("#pulse").classList.remove("on");
+    $("#state").textContent = `Offline — ${e.message}`;
+  }
+}
+
+/* ---------- 손잡이 ---------- */
+
+$("#q").addEventListener("input", (e) => { query = e.target.value; draw(); });
+$("#archive").addEventListener("click", (e) => {
+  archived = !archived;
+  e.currentTarget.setAttribute("aria-pressed", String(archived));
+  filter = ALL;
+  refresh(true);
+});
+
+// 한글 입력 중의 Enter는 IME가 조합을 끝내는 데 쓴다. 그 Enter로 폼이 넘어가면 안 되고,
+// 조합이 끝난 뒤의 Enter는 넘어가야 한다. 브라우저 기본 동작만으로는 이게 어긋난다.
+function submitOnEnter(input, form) {
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
+  });
+}
+
+// 새 프로젝트 = 이름 + 첫 타스크. 폴더는 첫 타스크와 함께 생긴다.
+$("#new").addEventListener("click", () => { $("#frmProject").reset(); $("#dlgProject").showModal(); $("#pName").focus(); });
+$("#pCancel").addEventListener("click", () => $("#dlgProject").close());
+submitOnEnter($("#pName"), $("#frmProject"));
+submitOnEnter($("#pTitle"), $("#frmProject"));
+$("#frmProject").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const project = $("#pName").value.trim();
+  const title = $("#pTitle").value.trim();
+  if (!project || !title) return;
+  try {
+    const task = await post("/api/tasks", { title, description: $("#pDesc").value, project });
+    $("#dlgProject").close();
+    toast(`Created ${project} with [${task.id}] ${task.title}`);
+    refresh(true);
+  } catch (err) { toast(err.message); }
+});
+
+// 프로젝트 상자 안의 새 타스크
+function openTaskDialog(project) {
+  newTaskProject = project;
+  $("#frmTask").reset();
+  $("#tHead").textContent = `${project || UNSORTED} — New Task`;
+  $("#dlgTask").showModal();
+  $("#tTitle").focus();
+}
+$("#tCancel").addEventListener("click", () => $("#dlgTask").close());
+submitOnEnter($("#tTitle"), $("#frmTask"));
+$("#frmTask").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const title = $("#tTitle").value.trim();
+  if (!title) return;
+  try {
+    const task = await post("/api/tasks", { title, description: $("#tDesc").value, project: newTaskProject });
+    $("#dlgTask").close();
+    toast(`Created [${task.ref}] ${task.title}`);
+    refresh(true);
+  } catch (err) { toast(err.message); }
+});
+
+// 피드백. GitHub 새 이슈 주소에 제목·본문을 실어 새 탭으로 연다. 토큰도 서버 호출도 없다.
+$("#feedback").addEventListener("click", () => { $("#frmFeedback").reset(); $("#dlgFeedback").showModal(); $("#fbTitle").focus(); });
+$("#fbCancel").addEventListener("click", () => $("#dlgFeedback").close());
+submitOnEnter($("#fbTitle"), $("#frmFeedback"));
+$("#frmFeedback").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const title = $("#fbTitle").value.trim();
+  if (!title) return;
+  const body = `${$("#fbBody").value.trim()}\n\n---\nDuet ${about.version} · ${archived ? "archive" : "board"} · ${plural(about.projects, "project")} · ${plural(tasks.length, "task")} · ${navigator.userAgent}`;
+  const url = `${about.repo}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+  window.open(url, "_blank", "noopener");
+  $("#dlgFeedback").close();
+});
+
+refresh();
+
+// 폴더가 바뀔 때만 다시 읽는다. 서버가 /api/events로 알려준다.
+// 연결이 끊기면 브라우저가 알아서 다시 붙고, 그 사이는 15초 폴링으로 버틴다.
+let fallback = null;
+function listen() {
+  const es = new EventSource("/api/events");
+  es.addEventListener("hello", () => { clearInterval(fallback); fallback = null; refresh(); });
+  es.addEventListener("change", () => refresh());
+  es.addEventListener("ping", (e) => { if (page && e.data && e.data !== page) refresh(); });
+  es.onerror = () => { if (!fallback) fallback = setInterval(refresh, 15000); };
+}
+listen();
+</script>
+</body>
+</html>
