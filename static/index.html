@@ -51,10 +51,7 @@
   .brand h1 .won { color: var(--accent); }
   .brand .tag { font-size: 0.85rem; color: var(--ink-2); }
   .hdr-ctls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 0.8rem; color: var(--ink-2); }
-  .hdr-ctls input {
-    width: 84px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px;
-    background: var(--surface); color: var(--ink); font: inherit; font-variant-numeric: tabular-nums;
-  }
+  .hdr-div { width: 1px; height: 18px; background: var(--grid); margin: 0 2px; }
   .cur-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
   .cur-toggle button { padding: 5px 12px; border: none; background: var(--surface); color: var(--ink-2); font: inherit; font-size: 0.78rem; cursor: pointer; }
   .cur-toggle button.on { background: var(--accent); color: #fff; font-weight: 600; }
@@ -238,14 +235,10 @@
       <span class="tag">내 AI 토큰, 한 화면에서</span>
     </div>
     <div class="hdr-ctls">
-      <span class="cur-toggle" role="group" aria-label="표시 통화">
-        <button id="curUSD">USD</button><button id="curKRW">KRW</button>
-      </span>
-      <label for="fxRate">환율</label>
-      <input type="number" id="fxRate" min="1" step="10" aria-label="USD 대 KRW 환율">
-      <label for="budget">월 예산 $</label>
-      <input type="number" id="budget" min="0" step="10">
+      <a class="btn ghost" id="viewerBtn" href="http://127.0.0.1:8377" target="_blank" rel="noopener" style="text-decoration:none">🗂️ 대화 뷰어</a>
+      <a class="btn ghost" id="duetBtn" href="http://127.0.0.1:8737" target="_blank" rel="noopener" style="text-decoration:none">📋 작업 보드</a>
       <a class="btn ghost" href="https://aicv.tokenbill.my" target="_blank" rel="noopener" style="text-decoration:none">📄 AICV</a>
+      <span class="hdr-div"></span>
       <button class="btn ghost" onclick="tokenbill.openMy()">마이페이지</button>
       <button class="btn ghost" onclick="tokenbill.openGuide()">가이드</button>
       <button class="btn ghost" onclick="tokenbill.openFb()">피드백</button>
@@ -279,15 +272,14 @@
       <span class="sub" id="tYesterdaySub">&nbsp;</span>
     </div>
     <div class="tile">
-      <span class="lbl" id="tProjLbl">비용 · ✅ API</span>
-      <span class="val" id="tProjected">—</span>
-      <span class="sub" id="tProjSub">&nbsp;</span>
+      <span class="lbl">내 티어</span>
+      <span class="val" id="tTier" style="font-size:1.25rem">—</span>
+      <span class="sub" id="tTierSub">&nbsp;</span>
     </div>
     <div class="tile">
-      <span class="lbl">예산 대비</span>
-      <span class="val" id="tBudget">—</span>
-      <div class="meter" id="budgetMeter"><div style="width:0%"></div></div>
-      <span class="sub" id="tBudgetSub">&nbsp;</span>
+      <span class="lbl">이번 달 활동일</span>
+      <span class="val" id="tDays">—</span>
+      <span class="sub" id="tDaysSub">&nbsp;</span>
     </div>
   </div>
 
@@ -330,14 +322,7 @@
         <div id="provList"></div>
       </section>
       <section class="card">
-        <h2>구독 연동 — 🖥️ MCP <span class="cnt" id="subCnt"></span>
-          <span style="margin-left:auto;display:inline-flex;gap:6px">
-            <a class="btn ghost" id="viewerBtn" href="http://127.0.0.1:8377" target="_blank" rel="noopener"
-               style="font-size:0.74rem;padding:4px 10px;text-decoration:none">🗂️ 대화 뷰어</a>
-            <a class="btn ghost" id="duetBtn" href="http://127.0.0.1:8737" target="_blank" rel="noopener"
-               style="font-size:0.74rem;padding:4px 10px;text-decoration:none">📋 작업 보드</a>
-          </span>
-        </h2>
+        <h2>구독 연동 — 🖥️ MCP <span class="cnt" id="subCnt"></span></h2>
         <div id="subProvList"></div>
       </section>
       <section class="card">
@@ -439,6 +424,14 @@
         <button class="btn" onclick="tokenbill.saveAicv()">저장</button>
       </span></div>
     <p class="chart-note" style="margin-top:6px" id="aicvNote">AICV 이력서 주소를 등록하면 내 공개 프로필에 <b>📄 AI 이력서</b> 버튼이 표시됩니다. (<a href="https://aicv.tokenbill.my" target="_blank" rel="noopener" class="guide-link">AICV 만들기</a>)</p>
+    <h2 style="font-size:0.95rem;margin:20px 0 6px">표시·예산 설정</h2>
+    <div class="myrow"><span class="mylbl">통화</span>
+      <span class="cur-toggle" role="group"><button id="curUSD">USD</button><button id="curKRW">KRW</button></span></div>
+    <div class="myrow"><span class="mylbl">환율</span>
+      <input type="number" id="fxRate" min="1" step="10" style="width:110px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;background:var(--page);color:var(--ink);font:inherit;font-size:0.85rem;font-variant-numeric:tabular-nums"></div>
+    <div class="myrow"><span class="mylbl">월 예산 $</span>
+      <input type="number" id="budget" min="0" step="10" style="width:110px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;background:var(--page);color:var(--ink);font:inherit;font-size:0.85rem;font-variant-numeric:tabular-nums"></div>
+    <p class="chart-note" style="margin-top:6px">예산을 설정하면 도달 시(80%·100%) 이메일 알림과 인사이트에 반영됩니다.</p>
     <h2 style="font-size:0.95rem;margin:20px 0 6px">구독 사용량 연동 (MCP)</h2>
     <p class="chart-note" style="margin:0 0 10px" id="myIntro">Claude Code·Codex CLI 등 <b>구독으로 쓰는 AI의 토큰</b>도 리더보드에 합산할 수 있습니다.</p>
     <div id="upTokenBox"></div>
@@ -581,7 +574,9 @@
     "마이페이지": "My Page", "가이드": "Guide", "피드백": "Feedback",
     "관리자": "Admin", "로그아웃": "Log out",
     "이번 달 토큰": "Tokens this month", "어제 토큰": "Tokens yesterday",
-    "비용 · ✅ API": "Cost · ✅ API", "예산 대비": "Budget used",
+    "내 티어": "My tier", "이번 달 활동일": "Active days",
+    "표시·예산 설정": "Display & budget", "통화": "Currency",
+    "예산을 설정하면 도달 시(80%·100%) 이메일 알림과 인사이트에 반영됩니다.": "Set a budget to get email alerts at 80% / 100% and budget-aware insights.",
     "일별 사용량 — ✅ API": "Daily usage — ✅ API", "선택한 달": "selected month",
     "토큰": "Tokens", "비용": "Cost",
     "일별 사용량 — 🖥️ 구독": "Daily usage — 🖥️ Subscription", "선택한 달 · 토큰": "selected month · tokens",
@@ -1257,7 +1252,6 @@
       : pm[0] + "년 " + Number(pm[1]) + "월" + (isCur ? " · 이번 달" : "");
     $("mNext").disabled = isCur;
     $("tTotalLbl").textContent = isCur ? tr("이번 달 토큰", "Tokens this month") : tr(Number(pm[1]) + "월 토큰", "Tokens in " + monthShort(Number(pm[1])));
-    $("tProjLbl").textContent = isCur ? tr("이번 달 비용 · ✅ API", "Cost this month · ✅ API") : tr(Number(pm[1]) + "월 비용 · ✅ API", monthShort(Number(pm[1])) + " cost · ✅ API");
 
     var yesterday = isCur ? sumRange(map, 1, 1) : 0;
     var prior7 = isCur ? sumRange(map, 8, 2) / 7 : 0;
@@ -1279,17 +1273,31 @@
     else if (Math.abs(diff) < 0.15) { ySub.textContent = tr("7일 평균과 비슷", "≈ 7-day average"); ySub.className = "sub"; }
     else if (diff > 0) { ySub.textContent = tr("▲ 평균 대비 +" + Math.round(diff * 100) + "%", "▲ +" + Math.round(diff * 100) + "% vs avg"); ySub.className = "sub up"; }
     else { ySub.textContent = tr("▼ 평균 대비 " + Math.round(diff * 100) + "%", "▼ " + Math.round(diff * 100) + "% vs avg"); ySub.className = "sub down"; }
-    $("tProjected").textContent = active.length ? fmt(monthTotal) : "—";
-    $("tProjSub").textContent = active.length
-      ? (isCur ? tr("월말 예상 " + fmt(projected) + " · 7일 평균 기준", "Projected " + fmt(projected) + " · 7-day avg") : tr("해당 달 실적", "Month actuals")) : " ";
+    // 내 티어 타일 — 주력 트랙(토큰 많은 쪽) 기준, 순위는 리더보드 데이터에서
+    var subMainTile = monthTokSub >= monthTokApi;
+    var tierTile = tierOf(subMainTile ? monthTokSub : monthTokApi);
+    $("tTier").textContent = active.length && (monthTokApi + monthTokSub) > 0
+      ? tierTile.emoji + " " + tierName(tierTile.name) : "—";
+    var rankTxt = " ";
+    if (lb && lb.me) {
+      var myR = subMainTile ? lb.me.sub_rank : lb.me.api_rank;
+      var myTot = subMainTile ? lb.total_sub_users : lb.total_api_users;
+      if (myR) rankTxt = tr(myR + "위 / " + myTot + "명 · " + (subMainTile ? "🖥️ 구독" : "✅ API"),
+                            "#" + myR + " of " + myTot + " · " + (subMainTile ? "🖥️ Sub" : "✅ API"));
+    }
+    $("tTierSub").textContent = rankTxt;
 
-    var pct = me.budget_usd > 0 ? (monthTotal / me.budget_usd) * 100 : 0;
-    $("tBudget").textContent = active.length && me.budget_usd > 0 ? Math.round(pct) + "%" : "—";
-    var meter = $("budgetMeter");
-    meter.className = "meter" + (pct >= 100 ? " over" : pct >= 80 ? " near" : "");
-    meter.firstElementChild.style.width = Math.min(100, pct) + "%";
-    $("tBudgetSub").textContent = active.length && me.budget_usd > 0
-      ? fmt(monthTotal) + " / " + fmt(me.budget_usd) : " ";
+    // 이번 달 활동일 타일
+    var actDays = 0;
+    Object.keys(map).forEach(function (d) {
+      if (d.indexOf(mp) !== 0) return;
+      var t = 0;
+      for (var pid2 in map[d]) t += map[d][pid2].tok;
+      if (t > 0) actDays++;
+    });
+    $("tDays").textContent = active.length ? tr(actDays + "일", String(actDays)) : "—";
+    $("tDaysSub").textContent = active.length
+      ? tr("AI를 사용한 날 수", isCur ? "days you used AI this month" : "active days that month") : " ";
 
     renderOnboard(connected, subActive);
     renderSync(connected);
