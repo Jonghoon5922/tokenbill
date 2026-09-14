@@ -496,6 +496,23 @@
   </div>
 </div>
 
+<!-- 대화 뷰어 연결 안내 -->
+<div id="viewerHelp" class="modal hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="modal-card" style="max-width:470px">
+    <h2 style="display:flex;justify-content:space-between;align-items:center">🗂️ 대화 뷰어가 응답하지 않아요
+      <button class="btn ghost" onclick="document.getElementById('viewerHelp').classList.add('hidden')">닫기</button></h2>
+    <p class="chart-note" style="margin:4px 0 12px" id="vhIntro">뷰어는 서버가 아니라 <b>내 PC에서 실행되는 프로그램</b>이에요. 대화 내용이 밖으로 나가지 않게 하기 위한 구조라, PC에서 꺼져 있으면 열리지 않습니다.</p>
+    <div class="guide">
+      <h3>방법 1 — Claude Code 켜기</h3>
+      <p>MCP가 연동된 Claude Code(또는 Codex·Gemini CLI)를 실행하면 뷰어가 자동으로 함께 떠요. 켠 뒤 다시 눌러보세요.</p>
+      <h3>방법 2 — 터미널에서 직접 실행</h3>
+      <p style="font-family:ui-monospace,Consolas,monospace;font-size:0.76rem;background:var(--chip);padding:10px 12px;border-radius:8px">npx -y github:Jonghoon5922/tokenbill --viewer</p>
+      <p class="chart-note">9월 초 이전에 연동했다면 구버전이 캐시되어 뷰어가 없을 수 있어요 — 그래도 안 되면 피드백으로 알려주세요.</p>
+    </div>
+    <a class="btn ghost" style="width:100%;margin-top:14px;text-align:center;text-decoration:none;display:block" href="http://127.0.0.1:8377" target="_blank" rel="noopener">그래도 열어보기</a>
+  </div>
+</div>
+
 <!-- 공지 팝업 -->
 <div id="noticeModal" class="modal hidden" onclick="if(event.target===this)tokenbill.closeNotice()">
   <div class="modal-card" style="max-width:440px">
@@ -566,6 +583,12 @@
     "회원 탈퇴": "Delete account",
     "🗂️ 대화 뷰어": "🗂️ Transcripts",
     "확인했어요": "Got it",
+    "🗂️ 대화 뷰어가 응답하지 않아요": "🗂️ The transcript viewer isn't responding",
+    "방법 1 — Claude Code 켜기": "Option 1 — Start Claude Code",
+    "MCP가 연동된 Claude Code(또는 Codex·Gemini CLI)를 실행하면 뷰어가 자동으로 함께 떠요. 켠 뒤 다시 눌러보세요.": "With MCP set up, the viewer starts automatically while Claude Code (or Codex / Gemini CLI) is running. Start it, then click again.",
+    "방법 2 — 터미널에서 직접 실행": "Option 2 — Run it manually",
+    "9월 초 이전에 연동했다면 구버전이 캐시되어 뷰어가 없을 수 있어요 — 그래도 안 되면 피드백으로 알려주세요.": "If you set up MCP before early September, a cached older version may lack the viewer — if it still fails, send us feedback.",
+    "그래도 열어보기": "Open anyway",
     "— 계정·API 키·수집 데이터가 즉시 삭제됩니다": "— your account, API keys and all collected data are deleted immediately"
   };
 
@@ -640,6 +663,7 @@
     $("fbNote").innerHTML = 'Submissions are posted with your nickname to the <a href="https://github.com/Jonghoon5922/tokenbill/issues" target="_blank" rel="noopener" class="guide-link">public issue tracker</a>.';
     $("myIntro").innerHTML = 'Tokens from <b>subscription AI tools</b> like Claude Code and Codex CLI can count toward the leaderboard too.';
     $("myGuideRef").innerHTML = 'See the <a href="#" class="guide-link" onclick="tokenbill.closeMy();tokenbill.openGuide();return false">user guide</a> for details.';
+    $("vhIntro").innerHTML = "The viewer is <b>a program running on your own PC</b>, not on our server — that's what keeps your conversations from ever leaving your machine. If it's not running there, it can't open.";
     $("guideBody").innerHTML = EN_GUIDE;
   }
   function switchLang() {
@@ -822,6 +846,7 @@
     $("dashView").classList.remove("hidden");
     refreshAll();
     checkNotice();
+    pingViewer();
   }
 
   // ── 공지 팝업 — 활성 공지를 사용자당 1회 표시 (닫으면 localStorage에 기록) ──
@@ -865,17 +890,23 @@
   $("lbSub").addEventListener("click", function () { lbTrack = "sub"; render(); });
 
   // 로컬 대화 뷰어 — MCP 업로더가 내 PC에서 띄우는 127.0.0.1 서버를 새 탭으로 연다 (서버는 대화를 볼 수 없음).
-  // 링크 탐색 자체는 그대로 두고, ping은 꺼져 있을 때 안내 토스트용으로만 쓴다 (PNA로 fetch가 막혀도 탭은 열림).
-  $("viewerBtn").addEventListener("click", function () {
+  // 살아있음이 확인된 경우에만 링크 기본 탐색(팝업 차단 없음), 아니면 오류 탭 대신 안내 모달을 띄운다.
+  var viewerAlive = null;
+  function pingViewer(cb) {
     var ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
-    var timer = ctl && setTimeout(function () { ctl.abort(); }, 2000);
+    var timer = ctl && setTimeout(function () { ctl.abort(); }, 1500);
     fetch("http://127.0.0.1:8377/api/ping", ctl ? { signal: ctl.signal } : {})
-      .then(function () { clearTimeout(timer); })
-      .catch(function () {
-        clearTimeout(timer);
-        toast(tr("뷰어 탭에 오류가 보이면 꺼져 있는 거예요 — Claude Code를 켜두면 자동 실행되고, 수동은: npx -y github:Jonghoon5922/tokenbill --viewer",
-                 "If the viewer tab shows an error, it's not running — it starts automatically while Claude Code is open. Manual: npx -y github:Jonghoon5922/tokenbill --viewer"));
-      });
+      .then(function () { clearTimeout(timer); viewerAlive = true; if (cb) cb(true); })
+      .catch(function () { clearTimeout(timer); viewerAlive = false; if (cb) cb(false); });
+  }
+  $("viewerBtn").addEventListener("mouseenter", function () { pingViewer(); });
+  $("viewerBtn").addEventListener("click", function (ev) {
+    if (viewerAlive === true) return;  // 확인됨 — 링크 그대로 새 탭
+    ev.preventDefault();
+    pingViewer(function (ok) {
+      if (ok) window.open("http://127.0.0.1:8377", "_blank");
+      else $("viewerHelp").classList.remove("hidden");
+    });
   });
 
   function syncErrors(sync) {
