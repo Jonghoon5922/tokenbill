@@ -680,53 +680,55 @@ def profile(handle: str, db: Session = Depends(get_db)):
 <meta name="twitter:title" content="{e(user.handle)}의 AI 활용 능력 — AICV">
 <meta name="twitter:description" content="{e(og_desc)}">
 <link rel="canonical" href="{e(og_url)}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
 <style>
-body{{font-family:'Segoe UI',Pretendard,sans-serif;max-width:720px;margin:0 auto;
- padding:32px 20px;background:#0f1117;color:#e6e8ee}}
-a{{color:#7aa2ff}} h1{{margin:0 0 4px}} small{{color:#8b90a0;font-weight:400}}
-.badge{{display:inline-block;background:#1d2333;border:1px solid #2e3650;color:#9fb4ff;
+body{{font-family:'IBM Plex Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+ max-width:720px;margin:0 auto;padding:32px 20px;background:#f9f9f7;color:#0b0b0b}}
+a{{color:#1c5cab}} h1{{margin:0 0 4px}} small{{color:#898781;font-weight:400}}
+.badge{{display:inline-block;background:#fcfcfb;border:1px solid rgba(11,11,11,.14);color:#1c5cab;
  border-radius:20px;padding:2px 12px;font-size:13px;margin:6px 0}}
 .stats{{display:flex;gap:12px;margin:20px 0;flex-wrap:wrap}}
-.stat{{background:#171b26;border:1px solid #242b3d;border-radius:10px;padding:12px 18px;
+.stat{{background:#fcfcfb;border:1px solid rgba(11,11,11,.1);border-radius:10px;padding:12px 18px;
  display:flex;flex-direction:column;min-width:90px}}
-.stat b{{font-size:20px}} .stat span{{color:#8b90a0;font-size:12px}}
-.sec{{margin:28px 0}} h2{{font-size:17px;border-bottom:1px solid #242b3d;padding-bottom:6px}}
+.stat b{{font-size:20px}} .stat span{{color:#898781;font-size:12px}}
+.sec{{margin:28px 0}} h2{{font-size:17px;border-bottom:1px solid #e1e0d9;padding-bottom:6px}}
 .row{{display:flex;align-items:center;gap:10px;margin:8px 0}}
-.lb{{width:110px;font-size:14px;color:#aab}} .sc{{width:32px;text-align:right;font-weight:600}}
-.bar{{flex:1;height:10px;background:#1d2333;border-radius:6px;overflow:hidden}}
-.fill{{height:100%;background:linear-gradient(90deg,#5b7bff,#8f6bff);border-radius:6px}}
+.lb{{width:110px;font-size:14px;color:#52514e}} .sc{{width:32px;text-align:right;font-weight:600}}
+.bar{{flex:1;height:10px;background:#f0efec;border-radius:6px;overflow:hidden}}
+.fill{{height:100%;background:linear-gradient(90deg,#2a78d6,#5b8fe0);border-radius:6px}}
 ul{{padding-left:20px}} li{{margin:6px 0}}
-.spark{{width:100%;height:64px}} .spark polyline{{fill:none;stroke:#7aa2ff;stroke-width:2}}
-.md-body{{background:#171b26;border:1px solid #242b3d;border-radius:10px;padding:6px 20px 16px;
+.spark{{width:100%;height:64px}} .spark polyline{{fill:none;stroke:#2a78d6;stroke-width:2}}
+.md-body{{background:#fcfcfb;border:1px solid rgba(11,11,11,.1);border-radius:10px;padding:6px 20px 16px;
  font-size:14px;line-height:1.7}}
 .md-body>h2{{margin:14px -20px 10px;padding:0 20px 6px}}
-.md-body h2:not(:first-child),.md-body h3{{font-size:16px;margin:20px 0 8px;color:#cdd3e0;
+.md-body h2:not(:first-child),.md-body h3{{font-size:16px;margin:20px 0 8px;color:#3a3a36;
  border:0;padding:0}}
 .md-body h4{{font-size:14px;margin:14px 0 6px}}
-.md-body blockquote{{margin:10px 0;padding:8px 14px;border-left:3px solid #5b7bff;
- background:#131722;border-radius:0 8px 8px 0;color:#9aa1b5;font-size:13px}}
+.md-body blockquote{{margin:10px 0;padding:8px 14px;border-left:3px solid #2a78d6;
+ background:#f0efec;border-radius:0 8px 8px 0;color:#52514e;font-size:13px}}
 .md-body table{{border-collapse:collapse;width:100%;margin:10px 0;font-size:13px;display:block;
  overflow-x:auto}}
-.md-body th,.md-body td{{border:1px solid #242b3d;padding:6px 10px;text-align:left}}
-.md-body th{{background:#1d2333}}
-.md-body code{{background:#0f1117;border:1px solid #242b3d;border-radius:4px;padding:1px 5px;
+.md-body th,.md-body td{{border:1px solid #e1e0d9;padding:6px 10px;text-align:left}}
+.md-body th{{background:#f0efec}}
+.md-body code{{background:#f0efec;border:1px solid #e1e0d9;border-radius:4px;padding:1px 5px;
  font-size:12px}}
-.md-body pre{{background:#0f1117;border:1px solid #242b3d;border-radius:8px;padding:12px;
+.md-body pre{{background:#f0efec;border:1px solid #e1e0d9;border-radius:8px;padding:12px;
  overflow-x:auto;font-size:12px}}
-.md-body hr{{border:0;border-top:1px solid #242b3d;margin:16px 0}}
+.md-body hr{{border:0;border-top:1px solid #e1e0d9;margin:16px 0}}
 .md-body p{{margin:8px 0}}
-.caveat li{{color:#8b90a0;font-size:13px}}
-.asset-lead{{margin:12px 0 8px;font-size:14px;color:#c3c9d8}}
+.caveat li{{color:#898781;font-size:13px}}
+.asset-lead{{margin:12px 0 8px;font-size:14px;color:#3a3a36}}
 .pills{{display:flex;flex-wrap:wrap;gap:8px}}
-.pill{{background:#1d2333;border:1px solid #2e3650;border-radius:16px;padding:4px 12px;
- font-size:13px;color:#cdd6f4}}
-.pill em{{font-style:normal;color:#7aa2ff;margin-left:6px;font-size:12px}}
-.pill.mcp{{border-color:#3d3163;background:#221d33;color:#d8ccf4}}
+.pill{{background:#f0efec;border:1px solid rgba(11,11,11,.12);border-radius:16px;padding:4px 12px;
+ font-size:13px;color:#0b0b0b}}
+.pill em{{font-style:normal;color:#1c5cab;margin-left:6px;font-size:12px}}
+.pill.mcp{{border-color:#cabcf0;background:#f1ecfa;color:#5b3fa8}}
 .asset-group{{margin:14px 0}}
 .asset-head{{margin-bottom:8px;font-size:14px}}
-.asset-head b{{color:#e6e8ee}}
-.asset-head span{{color:#8b90a0;margin-left:10px;font-size:13px}}
-footer{{margin-top:40px;color:#8b90a0;font-size:13px;border-top:1px solid #242b3d;padding-top:14px}}
+.asset-head b{{color:#0b0b0b}}
+.asset-head span{{color:#898781;margin-left:10px;font-size:13px}}
+footer{{margin-top:40px;color:#898781;font-size:13px;border-top:1px solid #e1e0d9;padding-top:14px}}
 </style></head><body>
 <h1>{e(user.handle)} <small>의 AI 활용 능력</small></h1>
 <div class="badge">🔍 로컬 사용 로그 기반 · {e(win.get('from', ''))} ~ {e(win.get('to', ''))} · schema v{pack.get('schema_version', 1)}</div>

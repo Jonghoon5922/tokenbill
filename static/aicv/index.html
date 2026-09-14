@@ -12,38 +12,68 @@
 <meta property="og:url" content="https://aicv.tokenbill.my/">
 <meta property="og:locale" content="ko_KR">
 <meta name="twitter:card" content="summary">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
 <style>
-:root{--bg:#0f1117;--card:#171b26;--line:#242b3d;--tx:#e6e8ee;--mut:#8b90a0;--ac:#5b7bff}
-*{box-sizing:border-box}
-body{font-family:'Segoe UI',Pretendard,sans-serif;background:var(--bg);color:var(--tx);
- max-width:720px;margin:0 auto;padding:40px 20px}
-h1{font-size:32px;margin:0}
-.tag{color:var(--mut);margin:8px 0 28px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;margin:16px 0}
-input{width:100%;padding:10px 12px;margin:6px 0;background:#0f1117;border:1px solid var(--line);
- border-radius:8px;color:var(--tx);font-size:14px}
-button{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:10px 18px;
- font-size:14px;cursor:pointer;margin:6px 4px 0 0}
-button.ghost{background:transparent;border:1px solid var(--line);color:var(--mut)}
+:root{--page:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;
+ --grid:#e1e0d9;--border:rgba(11,11,11,.1);--accent:#2a78d6;--accent-ink:#1c5cab;
+ --chip:#f0efec;--good:#006300;--bad:#a02020}
+@media(prefers-color-scheme:dark){:root{--page:#0d0d0d;--surface:#1a1a19;--ink:#fff;--ink2:#c3c2b7;
+ --muted:#898781;--grid:#2c2c2a;--border:rgba(255,255,255,.1);--accent:#3987e5;--accent-ink:#86b6ef;
+ --chip:#262624;--good:#0ca30c;--bad:#e66767}}
+*{box-sizing:border-box;margin:0}
+body{font-family:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+ background:var(--page);color:var(--ink);max-width:760px;margin:0 auto;padding:28px 20px 60px;line-height:1.55}
+header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding-bottom:16px;
+ border-bottom:1px solid var(--grid);margin-bottom:20px}
+h1{font-size:1.45rem;font-weight:700;letter-spacing:-.02em}
+h1 b{color:var(--accent)}
+.tag{font-size:.85rem;color:var(--ink2)}
+header a.home{margin-left:auto;font-size:.78rem;color:var(--muted);text-decoration:none;
+ border:1px solid var(--border);border-radius:7px;padding:5px 12px}
+header a.home:hover{background:var(--chip)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;margin:14px 0}
+h3{font-size:.95rem;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+h3 .n{display:inline-flex;width:22px;height:22px;border-radius:7px;background:var(--accent);color:#fff;
+ align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex:none}
+h3 .done{margin-left:auto;font-size:.72rem;color:var(--good);font-weight:600}
+input{width:100%;padding:9px 12px;margin:6px 0;background:var(--page);border:1px solid var(--border);
+ border-radius:8px;color:var(--ink);font:inherit;font-size:.88rem}
+button{background:var(--accent);color:#fff;border:0;border-radius:7px;padding:8px 16px;
+ font:inherit;font-size:.82rem;font-weight:600;cursor:pointer;margin:6px 6px 0 0}
+button:hover{filter:brightness(.92)}
+button.ghost{background:transparent;border:1px solid var(--border);color:var(--ink2)}
+button.ghost:hover{background:var(--chip);filter:none}
 .hide{display:none}
-code,pre{background:#0f1117;border:1px solid var(--line);border-radius:8px;font-size:13px}
-pre{padding:12px;overflow-x:auto}
-code{padding:2px 6px}
-.mut{color:var(--mut);font-size:13px}
-.ok{color:#6fdc8c}.err{color:#ff7a7a}
-label{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:14px}
-.step{display:flex;gap:10px;margin:10px 0}.step b{color:var(--ac)}
-a{color:#7aa2ff}
+code,pre{background:var(--chip);border-radius:6px;font-family:ui-monospace,Consolas,monospace}
+pre{padding:11px 12px;overflow-x:auto;font-size:.76rem;border:1px solid var(--border)}
+code{padding:1px 6px;font-size:.8rem}
+.mut{color:var(--muted);font-size:.8rem}
+.ok{color:var(--good);font-size:.8rem}.err{color:var(--bad);font-size:.8rem}
+label{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:.88rem}
+.step{display:flex;gap:10px;margin:10px 0;font-size:.84rem;color:var(--ink2)}.step b{color:var(--accent-ink);flex:none}
+a{color:var(--accent-ink)}
+.status{display:flex;gap:8px 16px;align-items:center;flex-wrap:wrap;font-size:.84rem}
+.status .dot{width:9px;height:9px;border-radius:50%;flex:none}
+.pairwrap{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#pairBox{font-size:1.5rem;letter-spacing:8px;text-align:center;flex:1;min-width:200px;margin:0;
+ font-variant-numeric:tabular-nums}
+.saytxt{background:var(--chip);border-radius:8px;padding:10px 12px;font-size:.84rem;margin:10px 0 4px}
+footer{margin-top:28px;font-size:.75rem;color:var(--muted);text-align:center}
 </style>
 </head>
 <body>
-<h1>AICV</h1>
-<p class="tag">많이 썼다(리더보드)도, 시험 쳤다(자격증)도 아닌 —
-<b>실제 작업 로그가 AI 활용 능력을 증명</b>합니다. 지속 업데이트되는 이력서.</p>
+<header>
+  <h1>AI<b>CV</b></h1>
+  <span class="tag">실제 작업 로그가 AI 활용 능력을 증명합니다</span>
+  <a class="home" href="https://tokenbill.my">🏠 Tokenbill</a>
+</header>
 
 <!-- 로그인 -->
 <div id="auth" class="card">
-  <h3 style="margin-top:0">시작하기</h3>
+  <h3>시작하기</h3>
+  <p class="mut" style="margin-bottom:12px">많이 썼다(리더보드)도, 시험 쳤다(자격증)도 아닌 —
+  내 PC의 실제 AI 작업 로그로 만드는 <b>지속 업데이트 이력서</b>입니다. 구글 로그인 30초면 시작합니다.</p>
   <div id="googleBtn"></div>
   <div id="pwForm" class="hide">
     <input id="email" type="email" placeholder="이메일" autocomplete="email">
@@ -56,25 +86,41 @@ a{color:#7aa2ff}
 
 <!-- 대시보드 -->
 <div id="dash" class="hide">
+  <!-- 내 상태 요약 -->
   <div class="card">
-    <h3 style="margin-top:0">1. MCP 설치</h3>
-    <div class="step"><b>①</b><span>사용하는 AI 도구를 선택해 아래 한 줄 실행 (Node 18+ 필요):</span></div>
-    <div style="margin:6px 0">
+    <div class="status">
+      <span class="dot" id="stDot" style="background:var(--muted)"></span>
+      <b id="stMain">확인 중…</b>
+      <span class="mut" id="stSub"></span>
+      <span style="margin-left:auto;display:inline-flex;gap:6px">
+        <a id="stView" class="hide" href="#" target="_blank" rel="noopener"><button style="margin:0">내 프로필 보기</button></a>
+        <button id="stCopy" class="ghost hide" style="margin:0" onclick="copyProfile()">링크 복사</button>
+      </span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3><span class="n">1</span>MCP 설치 <span class="mut" style="font-weight:400">— 사용하는 AI 도구 선택</span></h3>
+    <div style="margin:2px 0 6px">
       <button class="tool-tab" data-tool="claude" onclick="pickTool('claude')">Claude Code</button>
       <button class="tool-tab ghost" data-tool="codex" onclick="pickTool('codex')">Codex CLI</button>
       <button class="tool-tab ghost" data-tool="gemini" onclick="pickTool('gemini')">Gemini CLI</button>
     </div>
     <pre id="installCmd">claude mcp add aicv -- npx -y github:Jonghoon5922/aicv</pre>
-    <p class="mut">그 외 MCP 지원 도구(Cursor 등)도 stdio 서버 등록 방식으로 사용할 수 있습니다.</p>
+    <button class="ghost" onclick="copyText('installCmd','설치 명령이 복사되었습니다')">명령 복사</button>
+    <p class="mut">터미널에 붙여넣기 한 줄이면 끝 (Node 18+ 필요). Cursor 등 다른 MCP 지원 도구도 등록 가능합니다.</p>
   </div>
 
   <div class="card">
-    <h3 style="margin-top:0">2. 계정 연결</h3>
-    <p class="mut">코드를 발급받아 AI에게 이렇게 말하세요:
-    <code>"aicv 연결해줘, 코드 XXXXXX"</code> — 연결하면 이후 AI를 쓸 때마다 프로필이 자동 갱신되고, 이력서 문장은 원할 때만 다시 씁니다.</p>
-    <pre id="pairBox" style="font-size:22px;letter-spacing:6px;text-align:center">──────</pre>
-    <button onclick="pairCode()">연결 코드 발급 (10분 유효)</button>
-    <details style="margin-top:12px"><summary class="mut" style="cursor:pointer">고급: 토큰 직접 등록</summary>
+    <h3><span class="n">2</span>계정 연결 <span class="done hide" id="doneConnect">✓ 연결됨</span></h3>
+    <div class="pairwrap">
+      <pre id="pairBox">──────</pre>
+      <button onclick="pairCode()" style="margin:0">연결 코드 발급</button>
+    </div>
+    <p class="mut" style="margin-top:8px">코드는 10분간 유효 · 발급 후 <b>새 AI 세션</b>에서 아래처럼 말하면 연결됩니다:</p>
+    <div class="saytxt" id="sayConnect">"aicv 연결해줘, 코드 ○○○○○○"</div>
+    <button class="ghost" id="sayCopy" onclick="copyText('sayConnect','문장이 복사되었습니다')">문장 복사</button>
+    <details style="margin-top:10px"><summary class="mut" style="cursor:pointer">고급: 토큰 직접 등록</summary>
       <pre id="tokenBox">아직 발급 전</pre>
       <button class="ghost" onclick="issueToken()">토큰 발급/재발급</button>
       <p class="mut">등록: <code id="mcpCmd">claude mcp add aicv -- npx -y github:Jonghoon5922/aicv --token ...</code></p>
@@ -82,9 +128,17 @@ a{color:#7aa2ff}
   </div>
 
   <div class="card">
-    <h3 style="margin-top:0">3. 공개 프로필</h3>
-    <p class="mut">프로필 주소(토큰명)는 가입 시 자동 생성됩니다. <b>공개 여부만 선택</b>하세요 (기본 비공개 — 끄면 아무도 못 봅니다).</p>
-    <label><input type="checkbox" id="pub" style="width:auto"> 프로필 공개</label>
+    <h3><span class="n">3</span>이력서 만들기 <span class="done hide" id="doneResume">✓ 데이터 수집 중</span></h3>
+    <p class="mut">연결된 AI 세션에서 이렇게 말하면, 내 작업 로그를 근거로 이력서 초안을 쓰고
+    <b>내가 확인한 것만</b> 발행됩니다:</p>
+    <div class="saytxt">"AI 활용 이력서 만들어줘"</div>
+    <p class="mut" style="margin-top:6px">이후엔 자동 — AI를 쓸 때마다 지표가 갱신되고, 문장은 "이력서에서 ○○ 고쳐줘" 한마디로 수정됩니다.</p>
+  </div>
+
+  <div class="card">
+    <h3><span class="n">4</span>공개 설정 <span class="done hide" id="donePublic">✓ 공개 중</span></h3>
+    <p class="mut">프로필 주소(토큰명)는 자동 생성됩니다 — <b>공개 여부만 선택</b>하세요 (기본 비공개).</p>
+    <label><input type="checkbox" id="pub" style="width:auto"> 프로필 공개 — 링크로 누구나 열람 가능</label>
     <input id="handle" placeholder="토큰명 (자동 생성 — 원하면 변경)" oninput="checkHandle()">
     <p id="handleMsg" class="mut" style="margin:2px 0"></p>
     <button onclick="saveMe()">저장</button>
@@ -93,17 +147,16 @@ a{color:#7aa2ff}
 
   <div class="card">
     <p class="mut" style="margin:0">마지막 업로드: <span id="lastEv">없음</span> ·
-    <a href="#" onclick="logout();return false">로그아웃</a> · <a href="#" onclick="deleteAccount();return false" style="color:#ff7a7a">계정 삭제</a></p>
+    <a href="#" onclick="logout();return false">로그아웃</a> · <a href="#" onclick="deleteAccount();return false" style="color:var(--bad)">계정 삭제</a></p>
   </div>
 </div>
 
 <div class="card">
-  <h3 style="margin-top:0">어떻게 동작하나요?</h3>
+  <h3>어떻게 동작하나요?</h3>
   <div class="step"><b>수집</b><span>MCP가 내 PC의 AI CLI 사용 로그를 스캔 — 대화 원문 없이 집계값만 (직접 만든 스킬·기술 스택·활용 사례 후보)</span></div>
-  <div class="step"><b>작성</b><span>내가 쓰는 AI(Claude Code·Codex·Gemini CLI 등 MCP 지원 도구)가 그 증거를 근거로 이력서 초안을 쓰고, <b>내가 확인한 것만</b> 올라갑니다</span></div>
-  <div class="step"><b>증명</b><span>공개 프로필 링크 하나로 공유 — 이후 AI를 쓸 때마다 지표가 자동 갱신되고, 문장은 "고쳐줘" 한마디로 부분 수정</span></div>
-  <p class="mut">프라이버시: 대화 원문·실제 경로는 서버로 전송되지 않으며, 포함된 팩은 서버가 거부합니다.
-  프로필은 기본 비공개입니다.</p>
+  <div class="step"><b>작성</b><span>내가 쓰는 AI가 그 증거를 근거로 이력서 초안을 쓰고, <b>내가 확인한 것만</b> 올라갑니다</span></div>
+  <div class="step"><b>증명</b><span>공개 프로필 링크 하나로 공유 — 이후 AI를 쓸 때마다 지표가 자동 갱신됩니다</span></div>
+  <p class="mut">프라이버시: 대화 원문·실제 경로는 서버로 전송되지 않으며, 포함된 팩은 서버가 거부합니다. 프로필은 기본 비공개입니다.</p>
 </div>
 
 <script>
@@ -125,7 +178,7 @@ async function boot() {
     s.src = "https://accounts.google.com/gsi/client"; s.async = true;
     s.onload = () => {
       google.accounts.id.initialize({client_id: cfg.google_client_id, callback: onGoogle});
-      google.accounts.id.renderButton($("googleBtn"), {theme: "filled_black", width: 280});
+      google.accounts.id.renderButton($("googleBtn"), {theme: "outline", width: 300, text: "continue_with"});
     };
     document.head.appendChild(s);
   }
@@ -151,6 +204,38 @@ function onLogin(t) { jwt = t; localStorage.setItem("aicv_jwt", t); loadMe(); }
 function logout() { jwt = ""; localStorage.removeItem("aicv_jwt");
   $("dash").classList.add("hide"); $("auth").classList.remove("hide"); }
 
+let myUrl = "";
+function renderStatus(me) {
+  const connected = !!me.upload_token && !!me.last_evidence;
+  const pub = !!(me.handle && me.is_public);
+  $("doneConnect").classList.toggle("hide", !connected);
+  $("doneResume").classList.toggle("hide", !me.last_evidence);
+  $("donePublic").classList.toggle("hide", !pub);
+  const dot = $("stDot"), main = $("stMain"), sub = $("stSub");
+  if (!me.upload_token) {
+    dot.style.background = "var(--muted)"; main.textContent = "아직 연결 전이에요";
+    sub.textContent = "아래 1·2단계면 1분 안에 끝납니다";
+  } else if (!me.last_evidence) {
+    dot.style.background = "#fab219"; main.textContent = "연결 코드 사용 대기 중";
+    sub.textContent = "AI 세션에서 연결을 마치면 데이터가 올라옵니다";
+  } else {
+    dot.style.background = "var(--good)";
+    main.textContent = pub ? "공개 프로필 운영 중" : "수집 중 (비공개)";
+    sub.textContent = "마지막 업로드 " + me.last_evidence;
+  }
+  myUrl = pub ? location.origin + "/r/" + me.handle : "";
+  $("stView").classList.toggle("hide", !pub);
+  $("stCopy").classList.toggle("hide", !pub);
+  if (pub) $("stView").href = "/r/" + me.handle;
+}
+function copyProfile() {
+  if (myUrl && navigator.clipboard) navigator.clipboard.writeText(myUrl).then(() => alert("프로필 링크가 복사되었습니다:\n" + myUrl));
+}
+function copyText(id, note) {
+  const t = $(id).textContent;
+  if (navigator.clipboard) navigator.clipboard.writeText(t).then(() => alert(note));
+}
+
 async function loadMe() {
   try {
     const me = await api("/api/me");
@@ -161,6 +246,7 @@ async function loadMe() {
     $("lastEv").textContent = me.last_evidence || "없음";
     $("profileLink").innerHTML = me.handle && me.is_public
       ? `공개 프로필: <a href="/r/${me.handle}" target="_blank">${location.origin}/r/${me.handle}</a>` : "";
+    renderStatus(me);
   } catch { logout(); }
 }
 function renderToken(t) {
@@ -207,6 +293,7 @@ async function pairCode() {
   try {
     const j = await api("/api/pair/start", {method: "POST"});
     $("pairBox").textContent = j.code;
+    $("sayConnect").textContent = `"aicv 연결해줘, 코드 ${j.code}"`;
   } catch (e) { alert(e.message); }
 }
 async function saveMe() {
@@ -218,6 +305,7 @@ async function saveMe() {
 }
 boot();
 </script>
-<p class="mut" style="text-align:center;margin-top:24px"><a href="/terms">이용약관</a> · <a href="/privacy">개인정보처리방침</a> · <a href="mailto:jackalope5922@gmail.com">문의</a></p>
+<footer><a href="/terms">이용약관</a> · <a href="/privacy">개인정보처리방침</a> ·
+<a href="https://tokenbill.my">Tokenbill</a> · <a href="mailto:jackalope5922@gmail.com">문의</a></footer>
 </body>
 </html>
