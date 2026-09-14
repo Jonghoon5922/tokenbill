@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AICV 관리자</title>
+<meta name="robots" content="noindex">
+<style>
+:root{--bg:#0f1117;--card:#171b26;--line:#242b3d;--tx:#e6e8ee;--mut:#8b90a0;--ac:#5b7bff}
+*{box-sizing:border-box}
+body{font-family:'Segoe UI',Pretendard,sans-serif;background:var(--bg);color:var(--tx);
+ max-width:900px;margin:0 auto;padding:32px 20px}
+h1{font-size:24px;margin:0 0 20px}
+.stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;
+ padding:14px 20px;min-width:110px}
+.stat b{font-size:22px;display:block}
+.stat span{color:var(--mut);font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);
+ border:1px solid var(--line);border-radius:10px;overflow:hidden}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line)}
+th{background:#1d2333;color:var(--mut);font-weight:600}
+.ok{color:#6fdc8c}.no{color:#555c6e}
+a{color:#7aa2ff;text-decoration:none}
+#msg{color:#ff7a7a;margin:20px 0}
+.wrap{overflow-x:auto}
+</style>
+</head>
+<body>
+<h1>AICV 관리자 <a href="/" style="font-size:13px;font-weight:400">← 대시보드</a></h1>
+<div class="stats" id="stats"></div>
+<div class="wrap"><table id="tbl" hidden>
+  <thead><tr><th>이메일</th><th>프로필</th><th>공개</th><th>연결</th><th>이력서</th><th>가입</th><th>마지막 업로드</th></tr></thead>
+  <tbody id="rows"></tbody>
+</table></div>
+<p id="msg"></p>
+<script>
+const jwt = localStorage.getItem("aicv_jwt") || "";
+fetch("/api/admin/overview", {headers: {Authorization: "Bearer " + jwt}})
+  .then(async r => { const j = await r.json(); if (!r.ok) throw new Error(j.detail || r.status); return j; })
+  .then(d => {
+    const t = d.totals;
+    document.getElementById("stats").innerHTML = [
+      ["가입자", t.users], ["공개 프로필", t.public_profiles], ["기기 연결", t.connected],
+      ["이력서 발행", t.with_resume], ["신규(7일)", t.new_users_7d], ["업로드(7일)", t.uploads_7d],
+    ].map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join("");
+    const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+    document.getElementById("rows").innerHTML = d.users.map(u => `<tr>
+      <td>${esc(u.email)}</td>
+      <td>${u.handle ? (u.is_public ? `<a href="/r/${esc(u.handle)}" target="_blank">${esc(u.handle)}</a>` : esc(u.handle)) : "—"}</td>
+      <td class="${u.is_public ? "ok" : "no"}">${u.is_public ? "공개" : "비공개"}</td>
+      <td class="${u.connected ? "ok" : "no"}">${u.connected ? "●" : "—"}</td>
+      <td class="${u.has_resume ? "ok" : "no"}">${u.has_resume ? "●" : "—"}</td>
+      <td>${esc(u.created_at)}</td>
+      <td>${esc(u.last_upload) || "—"}</td></tr>`).join("");
+    document.getElementById("tbl").hidden = false;
+  })
+  .catch(e => {
+    document.getElementById("msg").textContent =
+      "접근 불가: " + e.message + " — 관리자 계정으로 먼저 대시보드(/)에서 로그인하세요.";
+  });
+</script>
+</body>
+</html>

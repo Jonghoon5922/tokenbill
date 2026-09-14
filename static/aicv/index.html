@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AICV — 실제 작업 로그가 역량을 증명합니다</title>
+<meta name="description" content="로컬 AI CLI 사용 로그로 만드는 증거 기반 AI 활용 능력 이력서. 리더보드도 자격증도 아닌, 실제 작업 로그가 증명합니다.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AICV">
+<meta property="og:title" content="AICV — 실제 작업 로그가 역량을 증명합니다">
+<meta property="og:description" content="로컬 AI CLI 사용 로그로 만드는 증거 기반 AI 활용 능력 이력서. 지속 업데이트되는 공개 프로필.">
+<meta property="og:url" content="https://aicv.tokenbill.my/">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary">
+<style>
+:root{--bg:#0f1117;--card:#171b26;--line:#242b3d;--tx:#e6e8ee;--mut:#8b90a0;--ac:#5b7bff}
+*{box-sizing:border-box}
+body{font-family:'Segoe UI',Pretendard,sans-serif;background:var(--bg);color:var(--tx);
+ max-width:720px;margin:0 auto;padding:40px 20px}
+h1{font-size:32px;margin:0}
+.tag{color:var(--mut);margin:8px 0 28px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;margin:16px 0}
+input{width:100%;padding:10px 12px;margin:6px 0;background:#0f1117;border:1px solid var(--line);
+ border-radius:8px;color:var(--tx);font-size:14px}
+button{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:10px 18px;
+ font-size:14px;cursor:pointer;margin:6px 4px 0 0}
+button.ghost{background:transparent;border:1px solid var(--line);color:var(--mut)}
+.hide{display:none}
+code,pre{background:#0f1117;border:1px solid var(--line);border-radius:8px;font-size:13px}
+pre{padding:12px;overflow-x:auto}
+code{padding:2px 6px}
+.mut{color:var(--mut);font-size:13px}
+.ok{color:#6fdc8c}.err{color:#ff7a7a}
+label{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:14px}
+.step{display:flex;gap:10px;margin:10px 0}.step b{color:var(--ac)}
+a{color:#7aa2ff}
+</style>
+</head>
+<body>
+<h1>AICV</h1>
+<p class="tag">많이 썼다(리더보드)도, 시험 쳤다(자격증)도 아닌 —
+<b>실제 작업 로그가 AI 활용 능력을 증명</b>합니다. 지속 업데이트되는 이력서.</p>
+
+<!-- 로그인 -->
+<div id="auth" class="card">
+  <h3 style="margin-top:0">시작하기</h3>
+  <div id="googleBtn"></div>
+  <div id="pwForm" class="hide">
+    <input id="email" type="email" placeholder="이메일" autocomplete="email">
+    <input id="pw" type="password" placeholder="비밀번호 (8자 이상)" autocomplete="current-password">
+    <button onclick="login()">로그인</button>
+    <button class="ghost" onclick="register()">회원가입</button>
+  </div>
+  <p id="authMsg" class="mut"></p>
+</div>
+
+<!-- 대시보드 -->
+<div id="dash" class="hide">
+  <div class="card">
+    <h3 style="margin-top:0">1. MCP 설치</h3>
+    <div class="step"><b>①</b><span>사용하는 AI 도구를 선택해 아래 한 줄 실행 (Node 18+ 필요):</span></div>
+    <div style="margin:6px 0">
+      <button class="tool-tab" data-tool="claude" onclick="pickTool('claude')">Claude Code</button>
+      <button class="tool-tab ghost" data-tool="codex" onclick="pickTool('codex')">Codex CLI</button>
+      <button class="tool-tab ghost" data-tool="gemini" onclick="pickTool('gemini')">Gemini CLI</button>
+    </div>
+    <pre id="installCmd">claude mcp add aicv -- npx -y github:Jonghoon5922/aicv</pre>
+    <p class="mut">그 외 MCP 지원 도구(Cursor 등)도 stdio 서버 등록 방식으로 사용할 수 있습니다.</p>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">2. 계정 연결</h3>
+    <p class="mut">코드를 발급받아 AI에게 이렇게 말하세요:
+    <code>"aicv 연결해줘, 코드 XXXXXX"</code> — 연결하면 이후 AI를 쓸 때마다 프로필이 자동 갱신되고, 이력서 문장은 원할 때만 다시 씁니다.</p>
+    <pre id="pairBox" style="font-size:22px;letter-spacing:6px;text-align:center">──────</pre>
+    <button onclick="pairCode()">연결 코드 발급 (10분 유효)</button>
+    <details style="margin-top:12px"><summary class="mut" style="cursor:pointer">고급: 토큰 직접 등록</summary>
+      <pre id="tokenBox">아직 발급 전</pre>
+      <button class="ghost" onclick="issueToken()">토큰 발급/재발급</button>
+      <p class="mut">등록: <code id="mcpCmd">claude mcp add aicv -- npx -y github:Jonghoon5922/aicv --token ...</code></p>
+    </details>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">3. 공개 프로필</h3>
+    <p class="mut">프로필 주소(토큰명)는 가입 시 자동 생성됩니다. <b>공개 여부만 선택</b>하세요 (기본 비공개 — 끄면 아무도 못 봅니다).</p>
+    <label><input type="checkbox" id="pub" style="width:auto"> 프로필 공개</label>
+    <input id="handle" placeholder="토큰명 (자동 생성 — 원하면 변경)" oninput="checkHandle()">
+    <p id="handleMsg" class="mut" style="margin:2px 0"></p>
+    <button onclick="saveMe()">저장</button>
+    <p id="profileLink" class="mut"></p>
+  </div>
+
+  <div class="card">
+    <p class="mut" style="margin:0">마지막 업로드: <span id="lastEv">없음</span> ·
+    <a href="#" onclick="logout();return false">로그아웃</a> · <a href="#" onclick="deleteAccount();return false" style="color:#ff7a7a">계정 삭제</a></p>
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">어떻게 동작하나요?</h3>
+  <div class="step"><b>수집</b><span>MCP가 내 PC의 AI CLI 사용 로그를 스캔 — 대화 원문 없이 집계값만 (직접 만든 스킬·기술 스택·활용 사례 후보)</span></div>
+  <div class="step"><b>작성</b><span>내가 쓰는 AI(Claude Code·Codex·Gemini CLI 등 MCP 지원 도구)가 그 증거를 근거로 이력서 초안을 쓰고, <b>내가 확인한 것만</b> 올라갑니다</span></div>
+  <div class="step"><b>증명</b><span>공개 프로필 링크 하나로 공유 — 이후 AI를 쓸 때마다 지표가 자동 갱신되고, 문장은 "고쳐줘" 한마디로 부분 수정</span></div>
+  <p class="mut">프라이버시: 대화 원문·실제 경로는 서버로 전송되지 않으며, 포함된 팩은 서버가 거부합니다.
+  프로필은 기본 비공개입니다.</p>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let jwt = localStorage.getItem("aicv_jwt") || "";
+const api = (path, opt = {}) => fetch(path, {
+  ...opt,
+  headers: {"Content-Type": "application/json",
+            ...(jwt ? {Authorization: "Bearer " + jwt} : {}), ...(opt.headers || {})},
+}).then(async r => { const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.detail || r.status); return j; });
+
+function msg(t, ok) { $("authMsg").textContent = t; $("authMsg").className = ok ? "ok" : "err"; }
+
+async function boot() {
+  const cfg = await api("/api/auth/config").catch(() => ({}));
+  if (cfg.google_client_id) {
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client"; s.async = true;
+    s.onload = () => {
+      google.accounts.id.initialize({client_id: cfg.google_client_id, callback: onGoogle});
+      google.accounts.id.renderButton($("googleBtn"), {theme: "filled_black", width: 280});
+    };
+    document.head.appendChild(s);
+  }
+  if (!cfg.google_only) $("pwForm").classList.remove("hide");
+  if (jwt) loadMe();
+}
+async function onGoogle(res) {
+  try { const j = await api("/api/auth/google", {method: "POST",
+    body: JSON.stringify({credential: res.credential})}); onLogin(j.token); }
+  catch (e) { msg(e.message); }
+}
+async function register() {
+  try { const j = await api("/api/auth/register", {method: "POST",
+    body: JSON.stringify({email: $("email").value, password: $("pw").value})}); onLogin(j.token); }
+  catch (e) { msg(e.message); }
+}
+async function login() {
+  try { const j = await api("/api/auth/login", {method: "POST",
+    body: JSON.stringify({email: $("email").value, password: $("pw").value})}); onLogin(j.token); }
+  catch (e) { msg(e.message); }
+}
+function onLogin(t) { jwt = t; localStorage.setItem("aicv_jwt", t); loadMe(); }
+function logout() { jwt = ""; localStorage.removeItem("aicv_jwt");
+  $("dash").classList.add("hide"); $("auth").classList.remove("hide"); }
+
+async function loadMe() {
+  try {
+    const me = await api("/api/me");
+    $("auth").classList.add("hide"); $("dash").classList.remove("hide");
+    if (me.upload_token) renderToken(me.upload_token);
+    $("handle").value = myHandle = me.handle || "";
+    $("pub").checked = !!me.is_public;
+    $("lastEv").textContent = me.last_evidence || "없음";
+    $("profileLink").innerHTML = me.handle && me.is_public
+      ? `공개 프로필: <a href="/r/${me.handle}" target="_blank">${location.origin}/r/${me.handle}</a>` : "";
+  } catch { logout(); }
+}
+function renderToken(t) {
+  $("tokenBox").textContent = t;
+  $("mcpCmd").textContent =
+    "claude mcp add aicv -- npx -y github:Jonghoon5922/aicv --token " + t;
+}
+async function issueToken() {
+  const j = await api("/api/uploader/token", {method: "POST"});
+  renderToken(j.upload_token);
+}
+const INSTALL_CMDS = {
+  claude: "claude mcp add aicv -- npx -y github:Jonghoon5922/aicv",
+  codex:  "codex mcp add aicv -- npx -y github:Jonghoon5922/aicv",
+  gemini: "gemini mcp add aicv npx -y github:Jonghoon5922/aicv",
+};
+function pickTool(t) {
+  $("installCmd").textContent = INSTALL_CMDS[t];
+  document.querySelectorAll(".tool-tab").forEach(b =>
+    b.classList.toggle("ghost", b.dataset.tool !== t));
+}
+let handleTimer = null, myHandle = "";
+function checkHandle() {
+  clearTimeout(handleTimer);
+  const h = $("handle").value.trim().toLowerCase();
+  const el = $("handleMsg");
+  if (!h || h === myHandle) { el.textContent = ""; return; }
+  handleTimer = setTimeout(async () => {
+    try {
+      const j = await api("/api/handle/check?handle=" + encodeURIComponent(h));
+      el.textContent = (j.available ? "✓ " : "✕ ") + j.reason +
+        (j.available ? ` — ${location.origin}/r/${h}` : "");
+      el.className = j.available ? "ok" : "err";
+    } catch { el.textContent = ""; }
+  }, 350);
+}
+async function deleteAccount() {
+  if (!confirm("계정과 모든 데이터(증거 팩·이력서·연결 정보)가 즉시 삭제됩니다. 계속할까요?")) return;
+  if (!confirm("정말 삭제할까요? 되돌릴 수 없습니다.")) return;
+  try { await api("/api/me", {method: "DELETE"}); alert("삭제되었습니다."); logout(); }
+  catch (e) { alert(e.message); }
+}
+async function pairCode() {
+  try {
+    const j = await api("/api/pair/start", {method: "POST"});
+    $("pairBox").textContent = j.code;
+  } catch (e) { alert(e.message); }
+}
+async function saveMe() {
+  try {
+    await api("/api/me", {method: "PATCH", body: JSON.stringify({
+      handle: $("handle").value || null, is_public: $("pub").checked})});
+    loadMe();
+  } catch (e) { alert(e.message); }
+}
+boot();
+</script>
+<p class="mut" style="text-align:center;margin-top:24px"><a href="/terms">이용약관</a> · <a href="/privacy">개인정보처리방침</a> · <a href="mailto:jackalope5922@gmail.com">문의</a></p>
+</body>
+</html>

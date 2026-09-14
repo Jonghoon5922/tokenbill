@@ -884,3 +884,34 @@ def _start_scheduler():
 @app.on_event("shutdown")
 def _stop_scheduler():
     scheduler.shutdown(wait=False)
+
+
+# ── AICV 포탈 흡수 — aicv.tokenbill.my 요청을 같은 컨테이너의 별도 앱으로 분기 ──
+from . import aicv_portal  # noqa: E402  (자체 DB·시크릿 사용 — main과 격리)
+
+
+class _HostDispatch:
+    """Host 헤더로 ASGI 앱을 고른다 — 한 프로세스에서 두 도메인 서비스.
+
+    lifespan 등 헤더 없는 스코프는 본체(tokenbill)로 보낸다 (스케줄러 기동 유지).
+    """
+
+    def __init__(self, primary, hosts):
+        self.primary, self.hosts = primary, hosts
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] in ("http", "websocket"):
+            host = ""
+            for k, v in scope.get("headers", []):
+                if k == b"host":
+                    host = v.decode("latin1").split(":")[0].lower()
+                    break
+            target = self.hosts.get(host)
+            if target is not None:
+                return await target(scope, receive, send)
+        return await self.primary(scope, receive, send)
+
+
+# uvicorn 진입점(app.main:app)이 이 디스패처를 받도록 마지막에 재할당한다
+_tokenbill_app = app
+app = _HostDispatch(_tokenbill_app, {"aicv.tokenbill.my": aicv_portal.app})
