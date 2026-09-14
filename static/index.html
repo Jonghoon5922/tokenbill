@@ -428,6 +428,12 @@
         <button class="btn" onclick="tokenbill.saveNick()">저장</button>
       </span></div>
     <p class="chart-note" style="margin-top:6px">별명은 토큰 리더보드에 표시됩니다.</p>
+    <div class="myrow"><span class="mylbl">AICV</span>
+      <span style="display:flex;gap:8px;flex:1">
+        <input type="url" id="myAicv" maxlength="255" placeholder="https://aicv.tokenbill.my/r/내주소" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;background:var(--page);color:var(--ink);font:inherit;font-size:0.8rem">
+        <button class="btn" onclick="tokenbill.saveAicv()">저장</button>
+      </span></div>
+    <p class="chart-note" style="margin-top:6px" id="aicvNote">AICV 이력서 주소를 등록하면 내 공개 프로필에 <b>📄 AI 이력서</b> 버튼이 표시됩니다. (<a href="https://aicv.tokenbill.my" target="_blank" rel="noopener" class="guide-link">AICV 만들기</a>)</p>
     <h2 style="font-size:0.95rem;margin:20px 0 6px">구독 사용량 연동 (MCP)</h2>
     <p class="chart-note" style="margin:0 0 10px" id="myIntro">Claude Code·Codex CLI 등 <b>구독으로 쓰는 AI의 토큰</b>도 리더보드에 합산할 수 있습니다.</p>
     <div id="upTokenBox"></div>
@@ -493,6 +499,15 @@
       <p>등록한 API 키는 서버에서 암호화되어 저장되며 화면에는 마스킹된 형태로만 표시됩니다.
       해제하면 키와 수집된 데이터가 함께 삭제됩니다.</p>
     </div>
+  </div>
+</div>
+
+<!-- 공개 프로필 -->
+<div id="profileModal" class="modal hidden" onclick="if(event.target===this)tokenbill.closeProfile()">
+  <div class="modal-card" style="max-width:420px">
+    <h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span id="pfName" style="flex:1"></span>
+      <button class="btn ghost" onclick="tokenbill.closeProfile()">닫기</button></h2>
+    <div id="pfBody"></div>
   </div>
 </div>
 
@@ -664,6 +679,7 @@
     $("myIntro").innerHTML = 'Tokens from <b>subscription AI tools</b> like Claude Code and Codex CLI can count toward the leaderboard too.';
     $("myGuideRef").innerHTML = 'See the <a href="#" class="guide-link" onclick="tokenbill.closeMy();tokenbill.openGuide();return false">user guide</a> for details.';
     $("vhIntro").innerHTML = "The viewer is <b>a program running on your own PC</b>, not on our server — that's what keeps your conversations from ever leaving your machine. If it's not running there, it can't open.";
+    $("aicvNote").innerHTML = 'Add your AICV resume URL and a <b>📄 AI resume</b> button appears on your public profile. (<a href="https://aicv.tokenbill.my" target="_blank" rel="noopener" class="guide-link">Create one</a>)';
     $("guideBody").innerHTML = EN_GUIDE;
   }
   function switchLang() {
@@ -980,7 +996,7 @@
         .then(function () { btn.disabled = false; btn.textContent = tr("보내기", "Send"); });
     },
     openMy: function () {
-      if (me) { $("myEmail").textContent = me.email; $("myNick").value = me.nickname || ""; renderUpToken(); }
+      if (me) { $("myEmail").textContent = me.email; $("myNick").value = me.nickname || ""; $("myAicv").value = me.aicv_url || ""; renderUpToken(); }
       $("myModal").classList.remove("hidden");
     },
     issueUpToken: function () {
@@ -1017,6 +1033,42 @@
       if (!confirm(msg)) return;
       api("/api/usage/subscription/" + source, { method: "DELETE" })
         .then(function () { toast(tr("삭제 완료", "Deleted")); return refreshAll(); })
+        .catch(function (e) { toast(e.message); });
+    },
+    openProfile: function (uid) {
+      api("/api/profile/" + uid).then(function (p) {
+        var subMain = p.month_sub >= p.month_api;
+        var tier = subMain ? p.tier_sub : p.tier_api;
+        var monthTok = subMain ? p.month_sub : p.month_api;
+        $("pfName").textContent = tier.emoji + " " + p.nickname;
+        var row = function (label, m, t) {
+          return '<div class="myrow"><span class="mylbl">' + label + '</span>' +
+            '<span style="font-size:0.85rem;font-variant-numeric:tabular-nums;flex:1">' +
+            tr("이번 달 ", "This month ") + '<b>' + fmtTok(m) + '</b> tok · ' + tr("누적 ", "all-time ") + fmtTok(t) + ' tok</span></div>';
+        };
+        $("pfBody").innerHTML =
+          '<div class="mytier"><span class="emj">' + tier.emoji + '</span>' +
+          '<div><div class="tn">' + esc(tierName(tier.name)) + '</div>' +
+          '<div class="ts">' + tr("이번 달 " + fmtTok(monthTok) + " tok", fmtTok(monthTok) + " tok this month") +
+          (subMain ? ' · 🖥️' : ' · ✅') + '</div></div></div>' +
+          row("✅ API", p.month_api, p.total_api) +
+          row(tr("🖥️ 구독", "🖥️ Sub"), p.month_sub, p.total_sub) +
+          (p.joined ? '<p class="chart-note" style="margin-top:8px">' + tr(p.joined.slice(0, 7).replace("-", "년 ") + "월부터 함께하고 있어요", "Member since " + p.joined.slice(0, 7)) + '</p>' : '') +
+          '<div style="display:flex;gap:8px;margin-top:14px">' +
+          (p.aicv_url ? '<a class="btn" style="text-decoration:none" href="' + esc(p.aicv_url) + '" target="_blank" rel="noopener">📄 ' + tr("AI 활용 이력서", "AI resume") + '</a>' : '') +
+          '<button class="btn ghost" onclick="tokenbill.copyProfileLink(' + p.uid + ')">' + tr("프로필 링크 복사", "Copy profile link") + '</button></div>';
+        $("profileModal").classList.remove("hidden");
+      }).catch(function (e) { toast(e.message); });
+    },
+    closeProfile: function () { $("profileModal").classList.add("hidden"); },
+    copyProfileLink: function (uid) {
+      if (navigator.clipboard) navigator.clipboard.writeText("https://tokenbill.my/u/" + uid)
+        .then(function () { toast(tr("프로필 링크가 복사되었습니다", "Profile link copied")); });
+    },
+    saveAicv: function () {
+      var v = $("myAicv").value.trim();
+      api("/api/me", { method: "PATCH", body: JSON.stringify({ aicv_url: v }) })
+        .then(function () { toast(v ? tr("AICV 주소가 등록되었습니다 — 프로필에 표시됩니다", "AICV link saved — shown on your profile") : tr("AICV 주소를 해제했습니다", "AICV link removed")); return refreshAll(); })
         .catch(function (e) { toast(e.message); });
     },
     closeNotice: function () {
@@ -1340,7 +1392,7 @@
     } else {
       var medals = ["🥇", "🥈", "🥉"];
       html += board.map(function (b) {
-        return '<div class="lbrow' + (b.me ? ' me' : '') + '">' +
+        return '<div class="lbrow' + (b.me ? ' me' : '') + '" style="cursor:pointer" title="' + tr('프로필 보기', 'View profile') + '" onclick="tokenbill.openProfile(' + b.uid + ')">' +
           '<span class="rk">' + (medals[b.rank - 1] || b.rank) + '</span>' +
           '<span class="nm">' + (b.me ? tr('나 (' + esc(b.name) + ')', 'Me (' + esc(b.name) + ')') : esc(b.name)) + ' ' + b.tier.emoji + '</span>' +
           '<span class="tk">' + fmtTok(b.tokens) + ' tok</span></div>';
@@ -1672,7 +1724,7 @@
       var medals = ["🥇", "🥈", "🥉"];
       function rows(board) {
         return board.slice(0, 3).map(function (b) {
-          return '<div class="lbrow"><span class="rk">' + (medals[b.rank - 1] || b.rank) + '</span>' +
+          return '<div class="lbrow" style="cursor:pointer" onclick="tokenbill.openProfile(' + b.uid + ')"><span class="rk">' + (medals[b.rank - 1] || b.rank) + '</span>' +
             '<span class="nm">' + esc(b.name) + ' ' + b.tier.emoji +
             ' <span style="color:var(--muted);font-size:0.74rem">' + esc(tierName(b.tier.name)) + '</span></span>' +
             '<span class="tk">' + fmtTok(b.tokens) + ' tok</span></div>';
@@ -1718,6 +1770,9 @@
   }).catch(function () { showEmailAuth(); });  // 설정 조회 실패 시 폼 노출 (잠금 방지)
 
   localize();
+  // 공유 프로필 주소(/u/123) — 로그인 여부와 무관하게 프로필 모달을 띄운다
+  var pmatch = location.pathname.match(/^\/u\/(\d+)$/);
+  if (pmatch) tokenbill.openProfile(Number(pmatch[1]));
   if (token) showDash();
 })();
 </script>

@@ -39,6 +39,8 @@ def init_db():
             if u_cols and "alert_month" not in u_cols:
                 conn.exec_driver_sql("ALTER TABLE users ADD COLUMN alert_month VARCHAR(7)")
                 conn.exec_driver_sql("ALTER TABLE users ADD COLUMN alert_level INTEGER NOT NULL DEFAULT 0")
+            if u_cols and "aicv_url" not in u_cols:
+                conn.exec_driver_sql("ALTER TABLE users ADD COLUMN aicv_url VARCHAR(255)")
             pk_cols = [r[1] for r in conn.exec_driver_sql("PRAGMA table_info(provider_keys)")]
             if pk_cols and "label" in pk_cols and "warning" not in pk_cols:
                 conn.exec_driver_sql("ALTER TABLE provider_keys ADD COLUMN warning VARCHAR(255)")

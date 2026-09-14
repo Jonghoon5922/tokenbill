@@ -82,6 +82,7 @@ class SettingsIn(BaseModel):
     fx_rate: float | None = Field(default=None, gt=0)
     currency: str | None = Field(default=None, pattern="^(USD|KRW)$")
     nickname: str | None = Field(default=None, max_length=32)  # ""이면 별명 해제
+    aicv_url: str | None = Field(default=None, max_length=255)  # ""이면 해제
 
 
 class KeyIn(BaseModel):
@@ -178,6 +179,8 @@ def me(user: models.User = Depends(current_user)):
         "alerts_available": alerts_available(),
         "upload_token": user.upload_token,
         "feedback_available": bool(GITHUB_TOKEN),
+        "aicv_url": user.aicv_url,
+        "uid": user.id,
     }
 
 
@@ -194,6 +197,12 @@ def update_me(body: SettingsIn, user: models.User = Depends(current_user), db: S
         if not nick:
             raise HTTPException(400, "별명은 비울 수 없습니다")
         user.nickname = nick
+    if body.aicv_url is not None:
+        url = body.aicv_url.strip()
+        # 피싱 방지 — 우리 AICV 프로필 주소만 허용
+        if url and not url.startswith("https://aicv.tokenbill.my/"):
+            raise HTTPException(400, "AICV 프로필 주소(https://aicv.tokenbill.my/…)만 등록할 수 있습니다")
+        user.aicv_url = url or None
     db.commit()
     return {"ok": True}
 
@@ -457,8 +466,7 @@ def leaderboard(user: models.User = Depends(current_user), db: Session = Depends
     """이번 달 토큰 순위 — 전체(구독 포함)와 검증(API만) 투 트랙."""
     board_all, board_api, board_sub = _boards(db)
     def pack(board):
-        return [{k: v for k, v in b.items() if k != "uid"} | {"me": b["uid"] == user.id}
-                for b in board[:10]]
+        return [b | {"me": b["uid"] == user.id} for b in board[:10]]
     def my(board):
         return next((b for b in board if b["uid"] == user.id), None)
     mine, mine_api, mine_sub = my(board_all), my(board_api), my(board_sub)
@@ -672,12 +680,49 @@ def leaderboard_public(request: Request, db: Session = Depends(get_db)):
     rate_limit(request, "pub-lb", 30, 60)
     _, board_api, board_sub = _boards(db)
     def pack(board):
-        return [{k: v for k, v in b.items() if k not in ("uid", "has_sub")} for b in board[:5]]
+        return [{k: v for k, v in b.items() if k != "has_sub"} for b in board[:5]]
     return {
         "top_api": pack(board_api),
         "top_sub": pack(board_sub),
         "total_users": db.query(func.count(models.User.id)).scalar(),
     }
+
+
+# ── 공개 프로필 ─────────────────────────────────────────────
+@app.get("/api/profile/{user_id}")
+def public_profile(user_id: int, request: Request, db: Session = Depends(get_db)):
+    """공개 프로필 — 별명·티어·토큰·AICV 링크만 (이메일 등 비노출)."""
+    rate_limit(request, "profile", 60, 60)
+    u = db.get(models.User, user_id)
+    if u is None:
+        raise HTTPException(404, "사용자를 찾을 수 없습니다")
+    month_start = date.today().replace(day=1)
+    tok = func.coalesce(func.sum(models.UsageDaily.input_tokens + models.UsageDaily.output_tokens), 0)
+
+    def tok_sum(api: bool, since=None):
+        q = db.query(tok).filter(models.UsageDaily.user_id == user_id)
+        cond = models.UsageDaily.provider.in_(PROVIDERS)
+        q = q.filter(cond if api else ~cond)
+        if since is not None:
+            q = q.filter(models.UsageDaily.day >= since)
+        return int(q.scalar() or 0)
+
+    month_api, month_sub = tok_sum(True, month_start), tok_sum(False, month_start)
+    return {
+        "uid": u.id,
+        "nickname": u.nickname or _mask_email(u.email),
+        "joined": u.created_at.date().isoformat() if u.created_at else None,
+        "month_api": month_api, "month_sub": month_sub,
+        "total_api": tok_sum(True), "total_sub": tok_sum(False),
+        "tier_api": _tier(month_api), "tier_sub": _tier(month_sub),
+        "aicv_url": u.aicv_url,
+    }
+
+
+@app.get("/u/{user_id}", include_in_schema=False)
+def profile_page(user_id: int):
+    # 공유용 프로필 주소 — SPA가 경로를 읽어 프로필 모달을 띄운다
+    return FileResponse("static/index.html", headers={"Cache-Control": "no-cache"})
 
 
 # ── 관리자 ──────────────────────────────────────────────────
