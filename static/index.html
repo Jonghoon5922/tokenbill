@@ -129,6 +129,19 @@
   .insight.ok { border-left-color: var(--good-ink); background: color-mix(in srgb, var(--good-ink) 7%, var(--surface)); }
   .insight.ok strong { color: var(--good-ink); }
   .empty { color: var(--muted); font-size: 0.85rem; padding: 18px 4px; text-align: center; }
+  /* ── 온보딩 (연동 전 사용자) ── */
+  .onboard { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: color-mix(in srgb, var(--accent) 4%, var(--surface)); }
+  .onboard h2 { font-size: 1.05rem; }
+  .onboard .ob-sub { font-size: 0.82rem; color: var(--ink-2); margin: -6px 0 14px; }
+  .ob-steps { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; }
+  @media (max-width: 800px) { .ob-steps { grid-template-columns: 1fr; } }
+  .ob-step { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .ob-step.reco { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  .ob-step h3 { font-size: 0.9rem; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ob-step h3 .n { display: inline-flex; width: 22px; height: 22px; border-radius: 7px; background: var(--accent); color: #fff; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex: none; }
+  .ob-step h3 .reco-badge { font-size: 0.66rem; background: var(--accent); color: #fff; border-radius: 999px; padding: 1px 8px; font-weight: 600; }
+  .ob-step p { font-size: 0.8rem; color: var(--ink-2); margin-bottom: 8px; }
+  .ob-cmd { background: var(--chip); padding: 9px 10px; border-radius: 8px; font-family: ui-monospace, Consolas, monospace; font-size: 0.68rem; white-space: pre-wrap; word-break: break-all; margin-bottom: 8px; }
   footer.ft { margin-top: 36px; font-size: 0.75rem; color: var(--muted); text-align: center; }
 
   /* ── auth ── */
@@ -246,6 +259,12 @@
     <span id="mLabel"></span>
     <button class="btn ghost" id="mNext" aria-label="다음 달">▶</button>
   </div>
+
+  <section class="card onboard hidden" id="onboardCard">
+    <h2 id="obTitle"></h2>
+    <p class="ob-sub" id="obSub"></p>
+    <div class="ob-steps" id="obSteps"></div>
+  </section>
 
   <div class="band">
     <div class="tile hero">
@@ -935,7 +954,12 @@
     },
     issueUpToken: function () {
       api("/api/uploader/token", { method: "POST" })
-        .then(function (r) { me.upload_token = r.upload_token; renderUpToken(); toast(tr("업로드 토큰이 발급되었습니다", "Upload token issued")); })
+        .then(function (r) {
+          me.upload_token = r.upload_token;
+          renderUpToken();
+          render();  // 온보딩 카드 등 토큰 유무에 따른 화면 갱신
+          toast(tr("업로드 토큰이 발급되었습니다 — 아래 명령을 복사해 터미널에 붙여넣으세요", "Upload token issued — copy the command below into your terminal"));
+        })
         .catch(function (e) { toast(e.message); });
     },
     copyCmd: function (id) {
@@ -1162,6 +1186,7 @@
     $("tBudgetSub").textContent = active.length && me.budget_usd > 0
       ? fmt(monthTotal) + " / " + fmt(me.budget_usd) : " ";
 
+    renderOnboard(connected, subActive);
     renderSync(connected);
     renderProviders();
     renderSubProviders();
@@ -1182,6 +1207,38 @@
     renderInsights(apiActive, yesterday, prior7, projected, monthTotal, map);
     renderAiStats();
     renderLeaderboard();
+  }
+
+  // 연동 전 사용자에게 최상단 온보딩 카드 표시 — 데이터가 들어오면 자동으로 사라진다
+  function renderOnboard(connected, subActive) {
+    var card = $("onboardCard");
+    var show = !connected.length && !subActive.length;
+    card.classList.toggle("hidden", !show);
+    if (!show) return;
+    var nick = me.nickname ? esc(me.nickname) : "";
+    $("obTitle").textContent = tr("👋 환영해요" + (nick ? ", " + me.nickname + "님" : "") + " — 1분이면 연동 끝!",
+                                  "👋 Welcome" + (nick ? ", " + me.nickname : "") + " — set up in one minute!");
+    $("obSub").textContent = tr("아래 둘 중 하나만 해도 대시보드가 살아나고 리더보드에 진입합니다.",
+                                "Do either one below and your dashboard comes alive — you'll join the leaderboard too.");
+    var s1;
+    if (me.upload_token) {
+      var cmd = "claude mcp add tokenbill -- npx -y github:Jonghoon5922/tokenbill --token " + me.upload_token;
+      s1 = '<p>' + tr("터미널에 아래 한 줄을 붙여넣고, Claude Code를 새로 시작하면 끝이에요. (Codex·Gemini는 앞 단어만 codex/gemini로)",
+                      "Paste this one line into your terminal, then restart Claude Code — done. (For Codex/Gemini just change the first word.)") + '</p>' +
+        '<div class="ob-cmd" id="obCmd">' + esc(cmd) + '</div>' +
+        '<button class="btn" onclick="tokenbill.copyCmd(\'obCmd\')">' + tr("명령 복사", "Copy command") + '</button>';
+    } else {
+      s1 = '<p>' + tr("Claude Code·Codex·Gemini CLI·Cursor를 쓰고 있다면, 토큰 발급 → 명령 한 줄이면 이후 전자동입니다.",
+                      "If you use Claude Code, Codex, Gemini CLI or Cursor: issue a token, paste one command, and it's automatic from then on.") + '</p>' +
+        '<button class="btn" onclick="tokenbill.issueUpToken()">' + tr("업로드 토큰 발급", "Issue upload token") + '</button>';
+    }
+    $("obSteps").innerHTML =
+      '<div class="ob-step reco"><h3><span class="n">1</span>' + tr("구독 토큰 자동 집계", "Auto-track subscription tokens") +
+      ' 🖥️ <span class="reco-badge">' + tr("추천 · 30초", "Recommended · 30s") + '</span></h3>' + s1 + '</div>' +
+      '<div class="ob-step"><h3><span class="n">2</span>' + tr("API 비용 추적", "Track API costs") + ' ✅</h3>' +
+      '<p>' + tr("OpenAI·Anthropic <b>조직 Admin 키</b>를 오른쪽 \"연결된 프로바이더\"에서 등록하면 실제 청구액 기준으로 분석해 드려요.",
+                 "Register an OpenAI/Anthropic <b>org Admin key</b> under \"Connected providers\" on the right for real billing-based analytics.") + '</p>' +
+      '<button class="btn ghost" onclick="tokenbill.openGuide()">' + tr("키 발급 방법 보기", "How to get a key") + '</button></div>';
   }
 
   function renderAiStats() {
