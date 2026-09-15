@@ -354,9 +354,14 @@
   <div class="cols">
     <div>
       <section class="card">
-        <h2>일별 사용량 — ✅ API <span class="cnt">선택한 달</span>
-          <span class="cur-toggle" role="group" aria-label="일별 보기 기준" style="margin-left:auto">
-            <button id="dvTok" class="on">토큰</button><button id="dvCost">비용</button>
+        <h2>일별 사용량 <span class="cnt">선택한 달</span>
+          <span style="margin-left:auto;display:inline-flex;gap:8px">
+            <span class="cur-toggle" role="group" aria-label="일별 트랙">
+              <button id="dtApi">✅ API</button><button id="dtSub">🖥️ 구독</button>
+            </span>
+            <span class="cur-toggle" role="group" aria-label="일별 보기 기준" id="dvWrap">
+              <button id="dvTok" class="on">토큰</button><button id="dvCost">비용</button>
+            </span>
           </span>
         </h2>
         <div class="legend" id="dailyLegend"></div>
@@ -364,21 +369,17 @@
         <p class="chart-note">막대에 마우스를 올리면 상세 내역이 표시됩니다.</p>
       </section>
       <section class="card">
-        <h2>일별 사용량 — 🖥️ 구독 <span class="cnt">선택한 달 · 토큰</span></h2>
-        <div class="legend" id="subLegend"></div>
-        <div id="subChart"></div>
-      </section>
-      <section class="card">
-        <h2>모델별 사용량 — ✅ API <span class="cnt">이번 달</span>
-          <span class="cur-toggle" role="group" aria-label="모델별 보기 기준" style="margin-left:auto">
-            <button id="mvTok" class="on">토큰</button><button id="mvCost">비용</button>
+        <h2>모델별 사용량 <span class="cnt">이번 달</span>
+          <span style="margin-left:auto;display:inline-flex;gap:8px">
+            <span class="cur-toggle" role="group" aria-label="모델 트랙">
+              <button id="mtApi">✅ API</button><button id="mtSub">🖥️ 구독</button>
+            </span>
+            <span class="cur-toggle" role="group" aria-label="모델별 보기 기준" id="mvWrap">
+              <button id="mvTok" class="on">토큰</button><button id="mvCost">비용</button>
+            </span>
           </span>
         </h2>
         <div id="modelChart"></div>
-      </section>
-      <section class="card">
-        <h2>모델별 사용량 — 🖥️ 구독 <span class="cnt">이번 달 · 토큰</span></h2>
-        <div id="subModelChart"></div>
       </section>
     </div>
     <div>
@@ -658,6 +659,7 @@
     "내 티어": "My tier", "이번 달 활동일": "Active days",
     "표시·예산 설정": "Display & budget", "통화": "Currency",
     "예산을 설정하면 도달 시(80%·100%) 이메일 알림과 인사이트에 반영됩니다.": "Set a budget to get email alerts at 80% / 100% and budget-aware insights.",
+    "일별 사용량": "Daily usage", "모델별 사용량": "By model",
     "일별 사용량 — ✅ API": "Daily usage — ✅ API", "선택한 달": "selected month",
     "토큰": "Tokens", "비용": "Cost",
     "일별 사용량 — 🖥️ 구독": "Daily usage — 🖥️ Subscription", "선택한 달 · 토큰": "selected month · tokens",
@@ -804,6 +806,7 @@
   var me = null, providers = [], daily = [], modelRows = [], breakdown = [], lb = null, aiStats = null;
   var modelView = "tok";
   var dailyView = "tok";
+  var dailyTrack = null, modelTrack = null;  // "api" | "sub" — 첫 렌더에서 데이터 있는 트랙으로 초기화
   var lbTrack = "api";  // api(프로바이더 검증) | sub(구독)
   function curMonth() { return iso(new Date()).slice(0, 7); }
   var viewMonth = null;  // 로드 후 curMonth()로 초기화 (iso 정의 이후 사용)
@@ -1025,6 +1028,10 @@
   $("dvTok").addEventListener("click", function () { dailyView = "tok"; render(); });
   $("lbApi").addEventListener("click", function () { lbTrack = "api"; render(); });
   $("lbSub").addEventListener("click", function () { lbTrack = "sub"; render(); });
+  $("dtApi").addEventListener("click", function () { dailyTrack = "api"; render(); });
+  $("dtSub").addEventListener("click", function () { dailyTrack = "sub"; render(); });
+  $("mtApi").addEventListener("click", function () { modelTrack = "api"; render(); });
+  $("mtSub").addEventListener("click", function () { modelTrack = "sub"; render(); });
 
   // 로컬 대화 뷰어 — MCP 업로더가 내 PC에서 띄우는 127.0.0.1 서버를 새 탭으로 연다 (서버는 대화를 볼 수 없음).
   // 살아있음이 확인된 경우에만 링크 기본 탐색(팝업 차단 없음), 아니면 오류 탭 대신 안내 모달을 띄운다.
@@ -1450,20 +1457,32 @@
     renderSync(connected);
     renderProviders();
     renderSubProviders();
+    // 트랙 토글 — 첫 렌더에서 데이터 있는 쪽을 기본 선택
+    if (dailyTrack === null) dailyTrack = monthTokSub > monthTokApi ? "sub" : "api";
+    if (modelTrack === null) modelTrack = dailyTrack;
+    $("dtApi").className = dailyTrack === "api" ? "on" : "";
+    $("dtSub").className = dailyTrack === "sub" ? "on" : "";
+    $("mtApi").className = modelTrack === "api" ? "on" : "";
+    $("mtSub").className = modelTrack === "sub" ? "on" : "";
+    $("dvWrap").classList.toggle("hidden", dailyTrack !== "api");   // 구독은 비용이 없다 → 토큰 고정
+    $("mvWrap").classList.toggle("hidden", modelTrack !== "api");
     $("dvCost").className = dailyView === "cost" ? "on" : "";
     $("dvTok").className = dailyView === "tok" ? "on" : "";
-    renderDaily(map, apiActive, "dailyChart", "dailyLegend", dailyView,
-      connected.length
-        ? tr("이 달 API 사용 기록이 아직 없습니다 — 매일 03시 자동 수집되며, '지금 갱신'으로 즉시 수집할 수 있어요.",
-             "No API usage recorded this month yet — collected daily at 03:00 KST, or use 'Sync now'.")
-        : tr("Admin 키를 연결하면 일별 사용량이 표시됩니다.", "Connect an Admin key to see daily usage."));
-    renderDaily(map, subActive, "subChart", "subLegend", "tok",
-      me.upload_token ? tr("이 달 구독 사용 기록이 아직 없습니다 — CLI 실행 시 자동 업로드됩니다.",
-                           "No subscription usage this month yet — uploads automatically when you run the CLI.")
-                      : tr("마이페이지에서 MCP를 연동하면 구독 토큰이 표시됩니다.",
-                           "Set up MCP sync on My Page to see subscription tokens."));
-    renderModels();
-    renderSubModels();
+    if (dailyTrack === "api") {
+      renderDaily(map, apiActive, "dailyChart", "dailyLegend", dailyView,
+        connected.length
+          ? tr("이 달 API 사용 기록이 아직 없습니다 — 매일 03시 자동 수집되며, '지금 갱신'으로 즉시 수집할 수 있어요.",
+               "No API usage recorded this month yet — collected daily at 03:00 KST, or use 'Sync now'.")
+          : tr("Admin 키를 연결하면 일별 사용량이 표시됩니다.", "Connect an Admin key to see daily usage."));
+    } else {
+      renderDaily(map, subActive, "dailyChart", "dailyLegend", "tok",
+        me.upload_token ? tr("이 달 구독 사용 기록이 아직 없습니다 — CLI 실행 시 자동 업로드됩니다.",
+                             "No subscription usage this month yet — uploads automatically when you run the CLI.")
+                        : tr("마이페이지에서 MCP를 연동하면 구독 토큰이 표시됩니다.",
+                             "Set up MCP sync on My Page to see subscription tokens."));
+    }
+    if (modelTrack === "api") renderModels();
+    else renderSubModels();
     renderInsights(apiActive, yesterday, prior7, projected, monthTotal, map);
     renderAiStats();
     renderLeaderboard();
@@ -1838,7 +1857,7 @@
   }
 
   function renderSubModels() {
-    var el = $("subModelChart");
+    var el = $("modelChart");
     var rows = modelRows.filter(function (r) { return !isApiProv(r.provider); });
     if (!rows.length) {
       el.innerHTML = '<p class="empty">' + tr('MCP 연동 후 구독 모델별 사용량이 집계됩니다.', 'Per-model subscription usage appears after MCP sync.') + '</p>';
