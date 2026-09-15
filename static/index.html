@@ -52,6 +52,18 @@
   .brand .tag { font-size: 0.85rem; color: var(--ink-2); }
   .hdr-ctls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 0.8rem; color: var(--ink-2); }
   .hdr-div { width: 1px; height: 18px; background: var(--grid); margin: 0 2px; }
+  /* ── 헤더 드롭다운 메뉴 ── */
+  details.menu { position: relative; }
+  details.menu > summary { list-style: none; }
+  details.menu > summary::-webkit-details-marker { display: none; }
+  details.menu[open] > summary { background: var(--chip); }
+  .menu .dd { position: absolute; right: 0; top: calc(100% + 6px); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 9px; box-shadow: 0 8px 24px rgba(0,0,0,0.14);
+    padding: 6px; display: flex; flex-direction: column; gap: 2px; min-width: 168px; z-index: 25; }
+  .menu .dd a, .menu .dd button { text-align: left; background: none; border: none; padding: 8px 12px;
+    border-radius: 6px; font: inherit; font-size: 0.84rem; color: var(--ink); cursor: pointer;
+    text-decoration: none; display: block; width: 100%; white-space: nowrap; }
+  .menu .dd a:hover, .menu .dd button:hover { background: var(--chip); }
   .cur-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
   .cur-toggle button { padding: 5px 12px; border: none; background: var(--surface); color: var(--ink-2); font: inherit; font-size: 0.78rem; cursor: pointer; }
   .cur-toggle button.on { background: var(--accent); color: #fff; font-weight: 600; }
@@ -244,16 +256,25 @@
       <span class="tag">내 AI 토큰, 한 화면에서</span>
     </div>
     <div class="hdr-ctls">
-      <a class="btn ghost" id="viewerBtn" href="http://127.0.0.1:8377" target="_blank" rel="noopener" style="text-decoration:none">🗂️ 대화 뷰어</a>
-      <a class="btn ghost" id="duetBtn" href="http://127.0.0.1:8737" target="_blank" rel="noopener" style="text-decoration:none">📋 작업 보드</a>
-      <a class="btn ghost" href="https://aicv.tokenbill.my" target="_blank" rel="noopener" style="text-decoration:none">📄 AICV</a>
-      <span class="hdr-div"></span>
-      <button class="btn ghost" onclick="tokenbill.openMy()">마이페이지</button>
-      <button class="btn ghost" onclick="tokenbill.openGuide()">가이드</button>
-      <button class="btn ghost" onclick="tokenbill.openFb()">피드백</button>
-      <button class="btn ghost hidden" id="adminBtn">관리자</button>
-      <button class="btn ghost" id="langBtn"></button>
-      <button class="btn ghost" id="logoutBtn">로그아웃</button>
+      <details class="menu">
+        <summary class="btn ghost">🧰 도구 ▾</summary>
+        <div class="dd">
+          <a id="viewerBtn" href="http://127.0.0.1:8377" target="_blank" rel="noopener">🗂️ 대화 뷰어</a>
+          <a id="duetBtn" href="http://127.0.0.1:8737" target="_blank" rel="noopener">📋 작업 보드</a>
+          <a href="https://aicv.tokenbill.my" target="_blank" rel="noopener">📄 AICV</a>
+        </div>
+      </details>
+      <details class="menu">
+        <summary class="btn ghost">내 계정 ▾</summary>
+        <div class="dd">
+          <button onclick="tokenbill.openMy()">마이페이지</button>
+          <button onclick="tokenbill.openGuide()">가이드</button>
+          <button onclick="tokenbill.openFb()">피드백</button>
+          <button class="hidden" id="adminBtn">관리자</button>
+          <button id="langBtn"></button>
+          <button id="logoutBtn">로그아웃</button>
+        </div>
+      </details>
     </div>
   </header>
 
@@ -586,6 +607,7 @@
     "지금 가입하고 순위에 도전해 보세요!": "Sign up now and claim your rank!",
     "환율": "FX rate", "월 예산 $": "Budget $/mo",
     "리더보드": "Leaderboard", "대화 뷰어": "Transcripts", "작업 보드": "Task board",
+    "🧰 도구 ▾": "🧰 Tools ▾", "내 계정 ▾": "Account ▾",
     "— 이번 달 얼마나 태웠나": "— how much you burned this month",
     "— 무슨 일을 했었나": "— what you worked on",
     "— 지금 뭘 하고 있나": "— what you're doing now",
@@ -801,6 +823,18 @@
     $("authView").classList.remove("hidden");
   }
   $("logoutBtn").addEventListener("click", logout);
+  // 드롭다운 메뉴: 바깥 클릭 시 닫기 + 항목 클릭 시 닫기
+  document.addEventListener("click", function (ev) {
+    document.querySelectorAll("details.menu[open]").forEach(function (m) {
+      if (!m.contains(ev.target)) m.removeAttribute("open");
+    });
+  });
+  document.querySelectorAll("details.menu .dd").forEach(function (dd) {
+    dd.addEventListener("click", function () {
+      var d = dd.closest("details");
+      if (d) d.removeAttribute("open");
+    });
+  });
   $("langBtn").addEventListener("click", switchLang);
   $("langBtnAuth").addEventListener("click", switchLang);
 
