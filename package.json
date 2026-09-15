@@ -1,6 +1,6 @@
 {
   "name": "tokenbill-mcp",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "AI 쓰는 만큼 쌓이는 기록 — tokenbill.my 리더보드로 겨루고, 로컬 대화 뷰어·작업 보드로 관리하세요. Your AI usage, recorded: compete on the tokenbill.my leaderboard, with a local transcript viewer and task board.",
   "bin": {
     "tokenbill-mcp": "./uploader/index.js"

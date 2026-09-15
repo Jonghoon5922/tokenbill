@@ -307,40 +307,29 @@ function statusSelect(task) {
   }
   // PMS답게 지금 상태만 보여준다. 고르면 그것이 상태가 된다 (= task.md의 `상태:` 줄).
   const sel = el("select", { className: `sel s-${slug(task.status)}`,
-    title: "Pick a status to pin it (🔒). Otherwise it follows the sessions." });
+    title: "Pick a status to pin it. 'Auto' lets it follow the sessions again." });
   if (!HUMAN.includes(task.status)) {
     sel.append(el("option", { value: "", textContent: label(task.status), selected: true, disabled: true }));
   }
   for (const st of HUMAN) {
     sel.append(el("option", { value: st, textContent: label(st), selected: task.status === st }));
   }
+  // 사람이 고정해 둔 상태면 'Auto' 항목으로 고정 해제 — 자물쇠 아이콘 대신 드롭다운 안에 둔다
+  if (task.override) {
+    sel.append(el("option", { value: "__auto__", textContent: "Auto ↻" }));
+  }
   sel.onchange = async () => {
     try {
-      await post(`/api/tasks/${task.ref}/status`, { status: sel.value });
-      toast(`${task.id} → ${label(sel.value)}`);
+      const auto = sel.value === "__auto__";
+      await post(`/api/tasks/${task.ref}/status`, { status: auto ? null : sel.value });
+      toast(auto ? `${task.id} → auto` : `${task.id} → ${label(sel.value)}`);
       refresh(true);
     } catch (e) { toast(e.message); }
   };
   return sel;
 }
 
-// 사람이 정해 둔 상태에 붙는 자물쇠. 누르면 그 줄을 지워 다시 세션에서 센다.
-function unlockButton(task) {
-  if (!task.override) return null;
-  const button = el("button", {
-    className: "lock", type: "button", textContent: "🔒",
-    title: "Pinned by you. Sessions won't change it. Click to let it follow the sessions again.",
-  });
-  button.onclick = async (e) => {
-    e.stopPropagation();
-    try {
-      await post(`/api/tasks/${task.ref}/status`, { status: null });
-      toast(`${task.id} unpinned`);
-      refresh(true);
-    } catch (err) { toast(err.message); }
-  };
-  return button;
-}
+// (자물쇠 버튼은 제거됨 — 고정 해제는 상태 드롭다운의 'Auto ↻' 항목이 담당한다)
 
 // 제목·설명 인라인 편집. 포커스를 잃을 때만 보낸다.
 function editable(task, field, text, className) {
@@ -436,7 +425,6 @@ function taskRow(task) {
       title,
       task.warning ? el("span", { className: "warn-dot", title: task.warning, textContent: "⚠" }) : null,
       sel,
-      unlockButton(task),
       busyTask(task) || archived ? null : xButton("Delete task", () => deleteTask(task))),
     el("div", { className: "tbody" },
       el("div", { className: "desc" }, editable(task, "description", task.description, "")),
