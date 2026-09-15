@@ -185,6 +185,7 @@ dialog .note{margin:-4px 0 12px;font-size:12px;color:var(--ink-3)}
       <div class="sub"><span class="pulse" id="pulse"></span><span id="state">Connecting…</span></div>
     </div>
     <div style="display:flex;gap:8px">
+      <button class="btn" id="lang" title="한국어 / English"></button>
       <button class="btn" id="feedback" title="Report a bug or suggest something — opens a GitHub issue">Feedback</button>
       <button class="btn" id="archive" aria-pressed="false">Archived</button>
       <button class="btn primary" id="new">+ New Project</button>
@@ -246,7 +247,12 @@ dialog .note{margin:-4px 0 12px;font-size:12px;color:var(--ink-3)}
 const STATUSES = ["대기", "진행중", "확인 필요", "완료", "보류", "취소"];
 const LABEL = { "대기": "Waiting", "진행중": "Running", "확인 필요": "Needs review",
                 "완료": "Done", "보류": "On hold", "취소": "Cancelled", "중지": "Stopped" };
-const label = (st) => LABEL[st] || st;
+// 화면 언어 — 브라우저가 한국어면 한국어, 그 외 영어. 헤더 버튼으로 전환(기억됨).
+let LANG = "en";
+try { LANG = localStorage.getItem("duet-lang") ||
+  (((navigator.language || "").toLowerCase().indexOf("ko") === 0) ? "ko" : "en"); } catch {}
+const t = (en, ko) => (LANG === "ko" ? ko : en);
+const label = (st) => (LANG === "ko" ? st : (LABEL[st] || st));
 // 사람이 고를 수 있는 것은 셋 — 끝났다, 잠시 둔다, 안 한다. 대기·진행중·확인 필요는 세션이
 // 없느냐 살아 있느냐 끊겼느냐는 사실이지 고르는 게 아니다. 되돌리려면 🔒를 푼다.
 const HUMAN = ["완료", "보류", "취소"];
@@ -254,7 +260,9 @@ const UNSORTED = "_미분류";   // 프로젝트를 모르는 타스크가 모�
 const ALL = "*";
 // CSS 클래스·변수 이름에는 띄어쓰기를 못 넣는다.
 const slug = (st) => st.replace(/\s+/g, "");
-const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const plural = (n, word) => LANG === "ko"
+  ? `${word === "task" ? "타스크" : "프로젝트"} ${n}개`
+  : `${n} ${word}${n === 1 ? "" : "s"}`;
 let tasks = [];
 let projects = [];      // 타스크가 없는 프로젝트 폴더도 상자로 뜬다
 let filter = ALL;
@@ -276,6 +284,38 @@ const el = (tag, props = {}, ...kids) => {
   return node;
 };
 const when = (stamp) => stamp ? stamp.replace("T", " ").split(".")[0].slice(5) : "";
+
+// ── 화면 언어 적용 (정적 요소) ──
+(function localize() {
+  const set = (sel, txt) => { const n = document.querySelector(sel); if (n) n.textContent = txt; };
+  const ph = (sel, txt) => { const n = document.querySelector(sel); if (n) n.placeholder = txt; };
+  const lab = (id, txt) => set(`label[for="${id}"]`, txt);
+  set("#lang", LANG === "ko" ? "EN" : "한국어");
+  document.querySelector("#lang").onclick = () => {
+    try { localStorage.setItem("duet-lang", LANG === "ko" ? "en" : "ko"); } catch {}
+    location.reload();
+  };
+  if (LANG !== "ko") return;
+  set("#feedback", "피드백");
+  document.querySelector("#feedback").title = "버그 신고·제안 — GitHub 새 이슈 창이 열립니다";
+  set("#new", "+ 새 프로젝트");
+  ph("#q", "검색");
+  set("#state", "연결 중…");
+  set("#dlgProject h2", "새 프로젝트");
+  lab("pName", "프로젝트 이름"); ph("#pName", "예: nefss");
+  lab("pTitle", "첫 타스크"); ph("#pTitle", "예: pc101pm 전환");
+  lab("pDesc", "설명 (선택)"); ph("#pDesc", "무슨 일인지 한 줄");
+  set("#pCancel", "취소"); set("#frmProject .primary", "만들기");
+  set("#tHead", "새 타스크");
+  lab("tTitle", "제목"); ph("#tTitle", "예: pc101pm 전환");
+  lab("tDesc", "설명 (선택)"); ph("#tDesc", "무슨 일인지 한 줄");
+  set("#tCancel", "취소"); set("#frmTask .primary", "만들기");
+  set("#dlgFeedback h2", "피드백");
+  lab("fbTitle", "제목"); ph("#fbTitle", "불편한 점, 있었으면 하는 것");
+  lab("fbBody", "내용 (선택)"); ph("#fbBody", "무엇을 했고, 무엇을 기대했고, 어떻게 됐는지");
+  set("#dlgFeedback .note", "여기 적은 내용이 채워진 GitHub 새 이슈 창이 열립니다. 제출은 거기서 하세요.");
+  set("#fbCancel", "취소"); set("#frmFeedback .primary", "이슈 열기");
+})();
 const JSON_HEADERS = { "content-type": "application/json" };
 
 async function api(path, options) {
@@ -303,11 +343,13 @@ const busyTask = (task) => task.counts["진행중"] > 0;
 function statusSelect(task) {
   if (busyTask(task)) {
     return el("span", { className: `tag s-${slug(task.status)}`, textContent: label(task.status),
-      title: "A session is working on this. The status updates itself when it finishes." });
+      title: t("A session is working on this. The status updates itself when it finishes.",
+               "세션이 작업 중입니다. 끝나면 상태가 저절로 바뀝니다.") });
   }
   // PMS답게 지금 상태만 보여준다. 고르면 그것이 상태가 된다 (= task.md의 `상태:` 줄).
   const sel = el("select", { className: `sel s-${slug(task.status)}`,
-    title: "Pick a status to pin it. 'Auto' lets it follow the sessions again." });
+    title: t("Pick a status to pin it. 'Auto' lets it follow the sessions again.",
+             "상태를 고르면 고정됩니다. '자동'을 고르면 다시 세션을 따라갑니다.") });
   if (!HUMAN.includes(task.status)) {
     sel.append(el("option", { value: "", textContent: label(task.status), selected: true, disabled: true }));
   }
@@ -316,13 +358,13 @@ function statusSelect(task) {
   }
   // 사람이 고정해 둔 상태면 'Auto' 항목으로 고정 해제 — 자물쇠 아이콘 대신 드롭다운 안에 둔다
   if (task.override) {
-    sel.append(el("option", { value: "__auto__", textContent: "Auto ↻" }));
+    sel.append(el("option", { value: "__auto__", textContent: t("Auto ↻", "자동 ↻") }));
   }
   sel.onchange = async () => {
     try {
       const auto = sel.value === "__auto__";
       await post(`/api/tasks/${task.ref}/status`, { status: auto ? null : sel.value });
-      toast(auto ? `${task.id} → auto` : `${task.id} → ${label(sel.value)}`);
+      toast(auto ? `${task.id} → ${t("auto", "자동")}` : `${task.id} → ${label(sel.value)}`);
       refresh(true);
     } catch (e) { toast(e.message); }
   };
@@ -334,7 +376,7 @@ function statusSelect(task) {
 // 제목·설명 인라인 편집. 포커스를 잃을 때만 보낸다.
 function editable(task, field, text, className) {
   if (busyTask(task)) {
-    return el("div", { className, textContent: text, title: "Locked while a session is working on it." });
+    return el("div", { className, textContent: text, title: t("Locked while a session is working on it.", "세션이 작업 중이라 잠시 수정할 수 없어요.") });
   }
   const node = el("div", { className, contentEditable: "true", spellcheck: false, textContent: text });
   node.dataset.editing = "";
@@ -350,7 +392,7 @@ function editable(task, field, text, className) {
     if (field === "title" && !value) { node.textContent = text; return; }
     try {
       await api(`/api/tasks/${task.ref}`, { method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify({ [field]: value }) });
-      toast(`${task.id} ${field} updated`);
+      toast(t(`${task.id} ${field} updated`, `${task.id} ${field === "title" ? "제목" : "설명"} 수정됨`));
       refresh(true);
     } catch (e) { toast(e.message); node.textContent = text; }
   };
@@ -395,8 +437,7 @@ function sessionRow(task, s) {
       el("span", { className: "sd" }),
       el("span", { className: "nm" },
         el("b", { textContent: s.title || s.id }),
-        el("span", { textContent: `${s.client} · ${s.alive ? "working" : when(s.heartbeat)}` })),
-      s.by_human ? el("span", { className: "locked", title: "Set by you", textContent: "🔒" }) : null,
+        el("span", { textContent: `${s.client} · ${s.alive ? t("working", "작업 중") : when(s.heartbeat)}` })),
       sessionControl(task, s)),
     el("ul", { className: "log" },
       logs.length ? logs : el("li", { className: "none" }, "No progress reported yet")));
@@ -425,7 +466,7 @@ function taskRow(task) {
       title,
       task.warning ? el("span", { className: "warn-dot", title: task.warning, textContent: "⚠" }) : null,
       sel,
-      busyTask(task) || archived ? null : xButton("Delete task", () => deleteTask(task))),
+      busyTask(task) || archived ? null : xButton(t("Delete task", "타스크 삭제"), () => deleteTask(task))),
     el("div", { className: "tbody" },
       el("div", { className: "desc" }, editable(task, "description", task.description, "")),
       task.warning ? el("div", { className: "warn", textContent: `⚠ ${task.warning}` }) : null,
@@ -456,9 +497,13 @@ async function remove(path, message) {
   } catch (e) { toast(e.message); }
 }
 const deleteTask = (task) =>
-  remove(`/api/tasks/${task.ref}`, `[${task.ref}] ${task.title}\nDelete this task and its session history? This cannot be undone.`);
+  remove(`/api/tasks/${task.ref}`, `[${task.ref}] ${task.title}\n` +
+    t("Delete this task and its session history? This cannot be undone.",
+      "이 타스크와 세션 기록을 삭제할까요? 되돌릴 수 없습니다."));
 const deleteProject = (name, count) =>
-  remove(`/api/projects/${name || UNSORTED}`, `Delete project '${name || UNSORTED}' and its ${plural(count, "task")}? This cannot be undone.`);
+  remove(`/api/projects/${name || UNSORTED}`,
+    t(`Delete project '${name || UNSORTED}' and its ${plural(count, "task")}? This cannot be undone.`,
+      `'${name || UNSORTED}' 프로젝트와 ${plural(count, "task")}를 삭제할까요? 되돌릴 수 없습니다.`));
 
 /* ---------- 프로젝트 상자 ---------- */
 
@@ -472,16 +517,17 @@ async function act(path, body, fallback) {
 
 function projectButtons(name, list) {
   if (archived) {
-    return [el("button", { className: "btn small", type: "button", textContent: "Unarchive",
-      onclick: () => act("/api/projects/unarchive", { name }, "Restored") })];
+    return [el("button", { className: "btn small", type: "button", textContent: t("Unarchive", "꺼내기"),
+      onclick: () => act("/api/projects/unarchive", { name }, t("Restored", "보드로 꺼냈습니다")) })];
   }
-  const out = [el("button", { className: "btn small", type: "button", textContent: "+ Task",
+  const out = [el("button", { className: "btn small", type: "button", textContent: t("+ Task", "+ 타스크"),
     onclick: () => openTaskDialog(name) })];
   // 살아 있는 세션이 있으면 서버가 거절한다. 여기서는 미리 숨기지 않고 이유를 토스트로 보여준다.
-  out.push(el("button", { className: "btn small", type: "button", textContent: "Archive",
-    title: "Move the whole project folder to the archive. Nothing is deleted.",
-    onclick: () => act("/api/projects/archive", { name }, "Archived") }));
-  out.push(xButton("Delete project", () => deleteProject(name, list.length)));
+  out.push(el("button", { className: "btn small", type: "button", textContent: t("Archive", "보관"),
+    title: t("Move the whole project folder to the archive. Nothing is deleted.",
+             "프로젝트 폴더째 보관함으로 옮깁니다. 지워지는 것은 없습니다."),
+    onclick: () => act("/api/projects/archive", { name }, t("Archived", "보관했습니다")) }));
+  out.push(xButton(t("Delete project", "프로젝트 삭제"), () => deleteProject(name, list.length)));
   return out;
 }
 
@@ -490,18 +536,18 @@ function projectCard(name, list) {
   const running = list.filter((t) => t.status === "진행중").length;
   const attention = list.filter((t) => t.status === "확인 필요").length;
   const key = name || UNSORTED;
-  const head = el("div", { className: "phead", title: "Click to fold or unfold" },
+  const head = el("div", { className: "phead", title: t("Click to fold or unfold", "누르면 접거나 펼칩니다") },
       el("h2", {}, el("span", { className: "caret", textContent: "▼" }), el("span", { textContent: key })),
       el("span", { className: "spacer" }),
-      running ? el("span", { className: "tag s-진행중", textContent: `${running} running` }) : null,
-      attention ? el("span", { className: "tag s-확인필요", textContent: `${attention} needs review` }) : null,
+      running ? el("span", { className: "tag s-진행중", textContent: t(`${running} running`, `진행중 ${running}`) }) : null,
+      attention ? el("span", { className: "tag s-확인필요", textContent: t(`${attention} needs review`, `확인 필요 ${attention}`) }) : null,
       el("span", { className: "pc mono", textContent: plural(list.length, "task") }),
       el("span", { className: "acts" }, projectButtons(name, list)));
   const card = el("article", { className: "pcard" + (folded.has(key) ? " folded" : "") },
     head,
     list.length
       ? el("div", { className: "trows" }, list.map(taskRow))
-      : el("div", { className: "pempty", textContent: "No tasks yet. Add one with + Task." }));
+      : el("div", { className: "pempty", textContent: t("No tasks yet. Add one with + Task.", "아직 타스크가 없어요 — [+ 타스크]로 추가하세요.") }));
   // 머리 아무 데나 누르면 접힌다. 버튼(+ Task·Archive·×)은 자기 일만 한다.
   head.onclick = (e) => {
     if (e.target.closest("button")) return;
@@ -529,7 +575,7 @@ function draw() {
   $("#chips").replaceChildren(...[ALL, ...STATUSES].map((s) => {
     const chip = el("button", { className: "chip" },
       s === ALL ? null : el("span", { className: "dot", style: `background:var(--${slug(s)})` }),
-      el("span", { textContent: s === ALL ? "All" : label(s) }),
+      el("span", { textContent: s === ALL ? t("All", "전체") : label(s) }),
       el("span", { className: "n mono", textContent: String(c[s]) }));
     chip.setAttribute("aria-pressed", String(filter === s));
     chip.onclick = () => pick(s);
@@ -562,8 +608,9 @@ function draw() {
 
   $("#grid").replaceChildren(...(cards.length ? cards : [
     el("div", { className: "empty", textContent: tasks.length
-      ? "No tasks match."
-      : archived ? "The archive is empty." : "No projects yet. Start with + New Project." }),
+      ? t("No tasks match.", "조건에 맞는 타스크가 없어요.")
+      : archived ? t("The archive is empty.", "보관함이 비어 있어요.")
+                 : t("No projects yet. Start with + New Project.", "아직 프로젝트가 없어요 — [+ 새 프로젝트]로 시작하세요.") }),
   ]));
 }
 
@@ -586,9 +633,10 @@ async function refresh(force = false) {
     $("#pulse").classList.add("on");
     $("#pulse").title = data.home;
     about = { version: data.version || "", repo: data.repo || "", projects: count };  // 경로는 볼 일이 드물다. 점에 마우스를 올리면 나온다
-    $("#state").textContent = `${archived ? "Archive" : "Live"} · ${plural(count, "project")} · ${plural(data.tasks.length, "task")}`;
+    $("#state").textContent = `${archived ? t("Archive", "보관함") : t("Live", "실시간")} · ${plural(count, "project")} · ${plural(data.tasks.length, "task")}`;
     // 보관함 안에서는 같은 버튼이 "돌아가기"다. 토글이라는 걸 사람이 알 필요 없다.
-    $("#archive").textContent = archived ? "← Board" : (data.archived ? `Archived ${data.archived}` : "Archived");
+    $("#archive").textContent = archived ? t("← Board", "← 보드")
+      : (data.archived ? t(`Archived ${data.archived}`, `보관함 ${data.archived}`) : t("Archived", "보관함"));
 
     const shape = JSON.stringify([archived, data.projects, data.tasks]);
     if (!force && (busy() || shape === drawn)) return;
@@ -598,7 +646,7 @@ async function refresh(force = false) {
     draw();
   } catch (e) {
     $("#pulse").classList.remove("on");
-    $("#state").textContent = `Offline — ${e.message}`;
+    $("#state").textContent = `${t("Offline", "연결 끊김")} — ${e.message}`;
   }
 }
 
