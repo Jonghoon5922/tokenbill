@@ -181,7 +181,14 @@
   #googleWrap.solo .ordiv { display: none; }
   .feat-list { margin: -6px 0 20px; display: flex; flex-direction: column; gap: 7px; font-size: 0.8rem; color: var(--ink-2); }
   .feat-list b { color: var(--ink); font-weight: 600; }
-  .feat-list .loc { font-size: 0.62rem; border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; color: var(--muted); vertical-align: 1px; }
+  .loc { font-size: 0.62rem; border: 1px solid var(--border); border-radius: 999px; padding: 0 7px; color: var(--muted); vertical-align: 1px; }
+  /* ── 트랙 배지: API(초록·프로바이더 검증) / 구독(보라·로컬 로그) — 차트 색과 동일 ── */
+  .tk-badge { display: inline-block; font-size: 0.66rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; vertical-align: 1px; white-space: nowrap; }
+  .tk-api { background: color-mix(in srgb, var(--s-openai) 13%, transparent); color: var(--s-openai); border: 1px solid color-mix(in srgb, var(--s-openai) 40%, transparent); }
+  .tk-sub { background: color-mix(in srgb, var(--s-cc) 13%, transparent); color: var(--s-cc); border: 1px solid color-mix(in srgb, var(--s-cc) 45%, transparent); }
+  /* 트랙 토글의 활성 색도 트랙 색으로 */
+  #dtApi.on, #mtApi.on, #lbApi.on { background: var(--s-openai); }
+  #dtSub.on, #mtSub.on, #lbSub.on { background: var(--s-cc); }
   .lang-link { text-align: center; margin-top: 16px; }
   .lang-link a { color: var(--muted); font-size: 0.76rem; text-decoration: none; cursor: pointer; }
   .lang-link a:hover { color: var(--accent-ink); text-decoration: underline; }
@@ -266,9 +273,9 @@
       <details class="menu">
         <summary class="btn ghost">🧰 도구 ▾</summary>
         <div class="dd">
-          <a id="viewerBtn" href="http://127.0.0.1:8377" target="_blank" rel="noopener">🗂️ 대화 뷰어</a>
-          <a id="duetBtn" href="http://127.0.0.1:8737" target="_blank" rel="noopener">📋 작업 보드</a>
-          <a href="https://aicv.tokenbill.my" target="_blank" rel="noopener">📄 AICV</a>
+          <a id="viewerBtn" href="http://127.0.0.1:8377" target="_blank" rel="noopener">🗂️ 대화 뷰어 <span class="loc">local</span></a>
+          <a id="duetBtn" href="http://127.0.0.1:8737" target="_blank" rel="noopener">📋 작업 보드 <span class="loc">local</span></a>
+          <a href="https://aicv.tokenbill.my" target="_blank" rel="noopener">📄 AICV <span class="loc">web</span></a>
         </div>
       </details>
       <details class="menu">
@@ -384,14 +391,14 @@
     </div>
     <div>
       <section class="card">
-        <h2>연결된 프로바이더 — ✅ API <span class="cnt" id="provCnt"></span>
+        <h2>연결된 프로바이더 <span class="tk-badge tk-api">✅ API</span> <span class="cnt" id="provCnt"></span>
           <button class="btn ghost" id="syncBtn" style="margin-left:auto">지금 갱신</button>
         </h2>
         <p class="chart-note" id="syncInfo" style="margin:-6px 0 10px"></p>
         <div id="provList"></div>
       </section>
       <section class="card">
-        <h2>구독 연동 — 🖥️ MCP <span class="cnt" id="subCnt"></span></h2>
+        <h2>구독 연동 <span class="tk-badge tk-sub">🖥️ 구독</span> <span class="cnt" id="subCnt"></span></h2>
         <div id="subProvList"></div>
       </section>
       <section class="card">
@@ -662,8 +669,8 @@
     "일별 사용량": "Daily usage", "모델별 사용량": "By model",
     "선택한 달": "selected month", "토큰": "Tokens", "비용": "Cost", "이번 달": "this month",
     "막대에 마우스를 올리면 상세 내역이 표시됩니다.": "Hover over a bar for details.",
-    "연결된 프로바이더 — ✅ API": "Connected providers — ✅ API", "지금 갱신": "Sync now",
-    "구독 연동 — 🖥️ MCP": "Subscriptions — 🖥️ MCP",
+    "연결된 프로바이더": "Connected providers", "지금 갱신": "Sync now",
+    "구독 연동": "Subscriptions",
     "인사이트": "Insights", "알림 테스트": "Test alert",
     "AI 활용 통계": "AI Usage Stats", "이번 달 · 전체 사용자": "this month · all users",
     "🏆 토큰 리더보드": "🏆 Token Leaderboard", "🖥️ 구독": "🖥️ Sub",
@@ -1183,7 +1190,8 @@
         var monthTok = subMain ? p.month_sub : p.month_api;
         $("pfName").textContent = tier.emoji + " " + p.nickname;
         var row = function (label, m, t) {
-          return '<div class="myrow"><span class="mylbl">' + label + '</span>' +
+          return '<div class="myrow"><span class="mylbl"><span class="tk-badge ' +
+            (label.indexOf("API") >= 0 ? "tk-api" : "tk-sub") + '">' + label + '</span></span>' +
             '<span style="font-size:0.85rem;font-variant-numeric:tabular-nums;flex:1">' +
             tr("이번 달 ", "This month ") + '<b>' + fmtTok(m) + '</b> tok · ' + tr("누적 ", "all-time ") + fmtTok(t) + ' tok</span></div>';
         };
@@ -1413,8 +1421,9 @@
     var projected = isCur ? monthTotal + last7avg * daysLeft : monthTotal;
 
     $("tTotal").textContent = active.length ? fmtTok(monthTok) + " tok" : "—";
-    $("tTotalSub").textContent = active.length
-      ? "✅ API " + fmtTok(monthTokApi) + " · 🖥️ " + tr("구독", "Sub") + " " + fmtTok(monthTokSub)
+    $("tTotalSub").innerHTML = active.length
+      ? '<span class="tk-badge tk-api">API</span> ' + fmtTok(monthTokApi) +
+        ' · <span class="tk-badge tk-sub">' + tr("구독", "Sub") + '</span> ' + fmtTok(monthTokSub)
       : tr("프로바이더를 연결해 보세요", "Connect a provider to get started");
     $("tYesterday").textContent = active.length && isCur ? fmtTok(yestTok) + " tok" : "—";
     var diff = prior7Tok > 0 ? (yestTok - prior7Tok) / prior7Tok : 0;
@@ -1491,15 +1500,16 @@
     renderDaily(map, active, "homeChart", "homeLegend", "tok",
       tr("아직 이 달 사용 기록이 없어요 — 연동하면 여기부터 채워집니다.", "No usage this month yet — it fills in once you're connected."));
     var bits = [];
-    bits.push(connected.length
-      ? tr("✅ API 키 " + connected.length + "개 연결", "✅ " + connected.length + " API keys")
-      : tr("✅ API 미연동", "✅ API not connected"));
-    bits.push(me.upload_token ? tr("🖥️ 구독 연동됨", "🖥️ Subscription synced") : tr("🖥️ 구독 미연동", "🖥️ Subscription not set up"));
+    bits.push('<span class="tk-badge tk-api">API</span> ' + (connected.length
+      ? tr("키 " + connected.length + "개 연결", connected.length + " keys connected")
+      : tr("미연동", "not connected")));
+    bits.push('<span class="tk-badge tk-sub">' + tr("구독", "Sub") + '</span> ' +
+      (me.upload_token ? tr("연동됨", "synced") : tr("미연동", "not set up")));
     if (me.last_sync_at) {
       var mins2 = Math.round((Date.now() - new Date(me.last_sync_at).getTime()) / 60000);
       bits.push(tr("마지막 갱신 ", "last sync ") + (mins2 < 60 ? mins2 + tr("분 전", "m ago") : Math.round(mins2 / 60) + tr("시간 전", "h ago")));
     }
-    $("homeStatus").textContent = bits.join("  ·  ");
+    $("homeStatus").innerHTML = bits.join("&nbsp; · &nbsp;");
     var box = $("homeLb");
     if (!lb) { box.innerHTML = ""; return; }
     var isSub = (lb.me.sub_tokens || 0) >= (lb.me.api_tokens || 0);
