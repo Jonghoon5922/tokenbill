@@ -359,7 +359,10 @@ function join(session, ref, title = "") {
   session.path = path.join(dir, `${session.id}.json`);
   session.save();
   if (old !== session.path) { try { fs.unlinkSync(old); } catch {} }
-  return readTask(dir);
+  // 사람이 고정해 둔 상태는 새 세션이 붙는 순간 푼다 — 다시 일하는 타스크가 '완료'로 남아 있지 않게.
+  const joined = readTask(dir);
+  if (joined.override) { writeTask(dir, joined.title, joined.description, null); return readTask(dir); }
+  return joined;
 }
 function taskOf(session) {
   if (!session.path || !TASK_DIR.test(path.basename(path.dirname(session.path)))) return null;

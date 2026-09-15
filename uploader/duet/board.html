@@ -348,23 +348,19 @@ function statusSelect(task) {
   }
   // PMS답게 지금 상태만 보여준다. 고르면 그것이 상태가 된다 (= task.md의 `상태:` 줄).
   const sel = el("select", { className: `sel s-${slug(task.status)}`,
-    title: t("Pick a status to pin it. 'Auto' lets it follow the sessions again.",
-             "상태를 고르면 고정됩니다. '자동'을 고르면 다시 세션을 따라갑니다.") });
+    title: t("Pick a status. It resets automatically when a new session joins this task.",
+             "상태를 고르세요. 새 세션이 이 타스크에 붙으면 자동으로 풀립니다.") });
   if (!HUMAN.includes(task.status)) {
     sel.append(el("option", { value: "", textContent: label(task.status), selected: true, disabled: true }));
   }
   for (const st of HUMAN) {
     sel.append(el("option", { value: st, textContent: label(st), selected: task.status === st }));
   }
-  // 사람이 고정해 둔 상태면 'Auto' 항목으로 고정 해제 — 자물쇠 아이콘 대신 드롭다운 안에 둔다
-  if (task.override) {
-    sel.append(el("option", { value: "__auto__", textContent: t("Auto ↻", "자동 ↻") }));
-  }
+  // 고정 해제 항목은 없다 — 사람이 정한 상태는 새 세션이 그 타스크에 붙는 순간 저절로 풀린다.
   sel.onchange = async () => {
     try {
-      const auto = sel.value === "__auto__";
-      await post(`/api/tasks/${task.ref}/status`, { status: auto ? null : sel.value });
-      toast(auto ? `${task.id} → ${t("auto", "자동")}` : `${task.id} → ${label(sel.value)}`);
+      await post(`/api/tasks/${task.ref}/status`, { status: sel.value });
+      toast(`${task.id} → ${label(sel.value)}`);
       refresh(true);
     } catch (e) { toast(e.message); }
   };
