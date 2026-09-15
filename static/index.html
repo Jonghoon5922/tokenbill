@@ -64,6 +64,13 @@
     border-radius: 6px; font: inherit; font-size: 0.84rem; color: var(--ink); cursor: pointer;
     text-decoration: none; display: block; width: 100%; white-space: nowrap; }
   .menu .dd a:hover, .menu .dd button:hover { background: var(--chip); }
+  /* ── 메인 탭 ── */
+  .tabs { display: flex; gap: 4px; margin: -8px 0 20px; border-bottom: 1px solid var(--grid); }
+  .tabs button { background: none; border: none; font: inherit; font-size: 0.92rem; font-weight: 600;
+    color: var(--muted); padding: 10px 14px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tabs button:hover { color: var(--ink-2); }
+  .tabs button.on { color: var(--accent-ink); border-bottom-color: var(--accent); }
+  .home-status { font-size: 0.8rem; color: var(--muted); margin: 4px 2px 18px; }
   .cur-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
   .cur-toggle button { padding: 5px 12px; border: none; background: var(--surface); color: var(--ink-2); font: inherit; font-size: 0.78rem; cursor: pointer; }
   .cur-toggle button.on { background: var(--accent); color: #fff; font-weight: 600; }
@@ -283,12 +290,13 @@
     <button class="btn ghost" style="margin-left:auto" onclick="tokenbill.stopImpersonate()">관리자로 돌아가기</button>
   </div>
 
-  <div class="monthnav">
-    <button class="btn ghost" id="mPrev" aria-label="이전 달">◀</button>
-    <span id="mLabel"></span>
-    <button class="btn ghost" id="mNext" aria-label="다음 달">▶</button>
-  </div>
+  <nav class="tabs" id="mainTabs">
+    <button data-tab="home" class="on">홈</button>
+    <button data-tab="usage">사용량</button>
+    <button data-tab="lb">리더보드</button>
+  </nav>
 
+  <div id="viewHome">
   <section class="card onboard hidden" id="onboardCard">
     <h2 id="obTitle"></h2>
     <p class="ob-sub" id="obSub"></p>
@@ -316,6 +324,31 @@
       <span class="val" id="tDays">—</span>
       <span class="sub" id="tDaysSub">&nbsp;</span>
     </div>
+  </div>
+
+  <p class="home-status" id="homeStatus"></p>
+
+  <section class="card">
+    <h2>이번 달 흐름 <span class="cnt" id="homeChartCnt"></span>
+      <button class="btn ghost" style="margin-left:auto;font-size:0.74rem;padding:4px 10px" onclick="tokenbill.goTab('usage')">자세히 보기</button>
+    </h2>
+    <div class="legend" id="homeLegend"></div>
+    <div id="homeChart"></div>
+  </section>
+
+  <section class="card">
+    <h2>🏆 리더보드 <span class="cnt">이번 달</span>
+      <button class="btn ghost" style="margin-left:auto;font-size:0.74rem;padding:4px 10px" onclick="tokenbill.goTab('lb')">전체 보기</button>
+    </h2>
+    <div id="homeLb"></div>
+  </section>
+  </div><!-- /viewHome -->
+
+  <div id="viewUsage" class="hidden">
+  <div class="monthnav">
+    <button class="btn ghost" id="mPrev" aria-label="이전 달">◀</button>
+    <span id="mLabel"></span>
+    <button class="btn ghost" id="mNext" aria-label="다음 달">▶</button>
   </div>
 
   <div class="cols">
@@ -370,16 +403,20 @@
         <h2>🌐 AI 활용 통계 <span class="cnt">이번 달 · 전체 사용자</span></h2>
         <div id="aiStatsBox"></div>
       </section>
-      <section class="card">
-        <h2>🏆 토큰 리더보드 <span class="cnt">이번 달</span>
-          <span class="cur-toggle" role="group" aria-label="리더보드 트랙" style="margin-left:auto">
-            <button id="lbApi" class="on">✅ API</button><button id="lbSub">🖥️ 구독</button>
-          </span>
-        </h2>
-        <div id="lbBox"></div>
-      </section>
     </div>
   </div>
+  </div><!-- /viewUsage -->
+
+  <div id="viewLb" class="hidden">
+  <section class="card">
+    <h2>🏆 토큰 리더보드 <span class="cnt">이번 달</span>
+      <span class="cur-toggle" role="group" aria-label="리더보드 트랙" style="margin-left:auto">
+        <button id="lbApi" class="on">✅ API</button><button id="lbSub">🖥️ 구독</button>
+      </span>
+    </h2>
+    <div id="lbBox"></div>
+  </section>
+  </div><!-- /viewLb -->
 
   <footer class="ft"><span id="ftNote">Tokenbill — OpenAI·Anthropic은 조직 Admin 키가 필요해요.</span>
     · <a href="#" class="guide-link" onclick="tokenbill.openGuide();return false">사용 가이드</a>
@@ -608,6 +645,9 @@
     "환율": "FX rate", "월 예산 $": "Budget $/mo",
     "리더보드": "Leaderboard", "대화 뷰어": "Transcripts", "작업 보드": "Task board",
     "🧰 도구 ▾": "🧰 Tools ▾", "내 계정 ▾": "Account ▾",
+    "홈": "Home", "사용량": "Usage",
+    "이번 달 흐름": "This month at a glance",
+    "자세히 보기": "Details", "전체 보기": "View all", "🏆 리더보드": "🏆 Leaderboard",
     "— 이번 달 얼마나 태웠나": "— how much you burned this month",
     "— 무슨 일을 했었나": "— what you worked on",
     "— 지금 뭘 하고 있나": "— what you're doing now",
@@ -835,6 +875,28 @@
       if (d) d.removeAttribute("open");
     });
   });
+
+  // ── 메인 탭 (홈 / 사용량 / 리더보드) ──
+  var TAB_VIEWS = { home: "viewHome", usage: "viewUsage", lb: "viewLb" };
+  function setTab(tb) {
+    if (!TAB_VIEWS[tb]) tb = "home";
+    try { localStorage.setItem("tokenbill-tab", tb); } catch (e) {}
+    Object.keys(TAB_VIEWS).forEach(function (k) {
+      $(TAB_VIEWS[k]).classList.toggle("hidden", k !== tb);
+    });
+    document.querySelectorAll("#mainTabs button").forEach(function (b) {
+      b.classList.toggle("on", b.dataset.tab === tb);
+    });
+  }
+  document.querySelectorAll("#mainTabs button").forEach(function (b) {
+    b.addEventListener("click", function () { setTab(b.dataset.tab); });
+  });
+  function initialTab() {
+    var tb = "home";
+    try { tb = localStorage.getItem("tokenbill-tab") || "home"; } catch (e) {}
+    if (location.hash === "#usage" || location.hash === "#lb" || location.hash === "#home") tb = location.hash.slice(1);
+    return tb;
+  }
   $("langBtn").addEventListener("click", switchLang);
   $("langBtnAuth").addEventListener("click", switchLang);
 
@@ -918,6 +980,7 @@
   function showDash() {
     $("authView").classList.add("hidden");
     $("dashView").classList.remove("hidden");
+    setTab(initialTab());
     refreshAll();
     checkNotice();
     pingViewer();
@@ -1017,6 +1080,7 @@
   });
 
   window.tokenbill = {
+    goTab: function (tb) { setTab(tb); window.scrollTo(0, 0); },
     showKeyForm: function (pid) {
       var f = $("form-" + pid);
       if (f) f.classList.toggle("hidden");
@@ -1403,6 +1467,41 @@
     renderInsights(apiActive, yesterday, prior7, projected, monthTotal, map);
     renderAiStats();
     renderLeaderboard();
+    renderHome(map, active, connected);
+  }
+
+  // ── 홈 탭 — 요약만: 이번 달 흐름 미니 차트 + 리더보드 top3 + 연동 상태 한 줄 ──
+  function renderHome(map, active, connected) {
+    $("homeChartCnt").textContent = tr("토큰 · 양 트랙 합산", "tokens · both tracks");
+    renderDaily(map, active, "homeChart", "homeLegend", "tok",
+      tr("아직 이 달 사용 기록이 없어요 — 연동하면 여기부터 채워집니다.", "No usage this month yet — it fills in once you're connected."));
+    var bits = [];
+    bits.push(connected.length
+      ? tr("✅ API 키 " + connected.length + "개 연결", "✅ " + connected.length + " API keys")
+      : tr("✅ API 미연동", "✅ API not connected"));
+    bits.push(me.upload_token ? tr("🖥️ 구독 연동됨", "🖥️ Subscription synced") : tr("🖥️ 구독 미연동", "🖥️ Subscription not set up"));
+    if (me.last_sync_at) {
+      var mins2 = Math.round((Date.now() - new Date(me.last_sync_at).getTime()) / 60000);
+      bits.push(tr("마지막 갱신 ", "last sync ") + (mins2 < 60 ? mins2 + tr("분 전", "m ago") : Math.round(mins2 / 60) + tr("시간 전", "h ago")));
+    }
+    $("homeStatus").textContent = bits.join("  ·  ");
+    var box = $("homeLb");
+    if (!lb) { box.innerHTML = ""; return; }
+    var isSub = (lb.me.sub_tokens || 0) >= (lb.me.api_tokens || 0);
+    var board = (isSub ? lb.top_sub : lb.top_api).slice(0, 3);
+    var medals = ["🥇", "🥈", "🥉"];
+    var html = board.map(function (b) {
+      return '<div class="lbrow' + (b.me ? ' me' : '') + '" style="cursor:pointer" onclick="tokenbill.openProfile(' + b.uid + ')">' +
+        '<span class="rk">' + (medals[b.rank - 1] || b.rank) + '</span>' +
+        '<span class="nm">' + (b.me ? tr('나 (' + esc(b.name) + ')', 'Me (' + esc(b.name) + ')') : esc(b.name)) + ' ' + b.tier.emoji + '</span>' +
+        '<span class="tk">' + fmtTok(b.tokens) + ' tok</span></div>';
+    }).join("");
+    if (!html) html = '<p class="empty">' + tr('이 달 기록이 아직 없어요 — 연동하면 자동 진입합니다.', 'No records this month — you join automatically once connected.') + '</p>';
+    var myR = isSub ? lb.me.sub_rank : lb.me.api_rank;
+    if (myR && !board.some(function (b) { return b.me; })) {
+      html += '<p class="chart-note" style="margin-top:6px">' + tr('내 순위: ' + myR + '위 (' + (isSub ? '🖥️ 구독' : '✅ API') + ')', 'My rank: #' + myR + ' (' + (isSub ? '🖥️ Sub' : '✅ API') + ')') + '</p>';
+    }
+    box.innerHTML = html;
   }
 
   // 연동 전 사용자에게 최상단 온보딩 카드 표시 — 데이터가 들어오면 자동으로 사라진다
