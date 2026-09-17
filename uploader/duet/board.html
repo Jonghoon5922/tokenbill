@@ -188,6 +188,8 @@ dialog .note{margin:-4px 0 12px;font-size:12px;color:var(--ink-3)}
       <button class="btn" id="lang" title="한국어 / English"></button>
       <button class="btn" id="feedback" title="Report a bug or suggest something — opens a GitHub issue">Feedback</button>
       <button class="btn" id="archive" aria-pressed="false">Archived</button>
+      <button class="btn" id="exportCsv" title="Download the tasks shown on screen as CSV (opens in Google Sheets / Excel)">CSV</button>
+      <button class="btn" id="exportMd" title="Copy the tasks shown on screen as Markdown">Markdown</button>
       <button class="btn primary" id="new">+ New Project</button>
     </div>
   </header>
@@ -297,6 +299,9 @@ const when = (stamp) => stamp ? stamp.replace("T", " ").split(".")[0].slice(5) :
   };
   if (LANG !== "ko") return;
   set("#feedback", "피드백");
+  document.querySelector("#exportCsv").title = "화면에 보이는 타스크를 CSV로 내려받기 (구글 시트·엑셀에서 열림)";
+  set("#exportMd", "마크다운");
+  document.querySelector("#exportMd").title = "화면에 보이는 타스크를 마크다운으로 복사";
   document.querySelector("#feedback").title = "버그 신고·제안 — GitHub 새 이슈 창이 열립니다";
   set("#new", "+ 새 프로젝트");
   ph("#q", "검색");
@@ -578,11 +583,8 @@ function draw() {
     return chip;
   }));
 
+  const shown = visibleTasks();
   const q = query.trim().toLowerCase();
-  const hit = (t) => !q || [t.id, t.title, t.description, t.project,
-    ...t.sessions.flatMap((s) => [s.title, s.client, s.summary || "", ...s.progress.map((p) => p.msg)]),
-  ].some((text) => String(text).toLowerCase().includes(q));
-  const shown = tasks.filter((t) => (filter === ALL || t.status === filter) && hit(t));
 
   // 프로젝트별로 묶는다. 모르는 것은 맨 아래.
   const groups = new Map();
@@ -649,6 +651,80 @@ async function refresh(force = false) {
 /* ---------- 손잡이 ---------- */
 
 $("#q").addEventListener("input", (e) => { query = e.target.value; draw(); });
+/* ---------- 내보내기 (CSV·마크다운) — 지금 화면에 보이는 필터 결과 기준 ---------- */
+
+// 상태 칩·검색이 적용된 타스크. 화면(draw)과 내보내기가 같은 함수를 써서 어긋나지 않는다.
+function visibleTasks() {
+  const q = query.trim().toLowerCase();
+  const hit = (t) => !q || [t.id, t.title, t.description, t.project,
+    ...t.sessions.flatMap((s) => [s.title, s.client, s.summary || "", ...s.progress.map((p) => p.msg)]),
+  ].some((text) => String(text).toLowerCase().includes(q));
+  return tasks.filter((t) => (filter === ALL || t.status === filter) && hit(t));
+}
+
+function exportRows() {
+  return visibleTasks().map((x) => {
+    const sessions = x.sessions || [];
+    const logs = sessions.flatMap((s) => (s.progress || []).map((p) => ({ t: p.t, msg: p.msg })))
+      .sort((a, b) => String(a.t).localeCompare(String(b.t)));
+    const done = sessions.map((s) => s.summary).filter(Boolean);
+    return {
+      project: x.project || "", id: x.id, title: x.title, status: x.status,
+      description: x.description || "", sessions: sessions.length,
+      last: (x.last_activity || "").replace("T", " ").split(".")[0],
+      latest: logs.length ? logs[logs.length - 1].msg : "", summary: done.join(" / "), logs,
+    };
+  });
+}
+function stamp() { return new Date().toISOString().slice(0, 10); }
+
+$("#exportCsv").addEventListener("click", () => {
+  const rows = exportRows();
+  const head = [t("project", "프로젝트"), t("id", "번호"), t("title", "제목"), t("status", "상태"),
+    t("description", "설명"), t("sessions", "세션 수"), t("last activity", "마지막 활동"),
+    t("latest log", "최근 진행"), t("summary", "마무리")];
+  const q = (v) => `"${String(v).replace(/"/g, '""').replace(/\r?\n/g, " ")}"`;
+  const body = rows.map((r) => [r.project, r.id, r.title, label(r.status), r.description,
+    r.sessions, r.last, r.latest, r.summary].map(q).join(","));
+  // BOM을 붙여야 엑셀이 한글을 깨뜨리지 않는다. 구글 시트는 있어도 무방.
+  const blob = new Blob(["﻿" + [head.map(q).join(","), ...body].join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const a = el("a", { href: URL.createObjectURL(blob), download: `duet-${archived ? "archive" : "tasks"}-${stamp()}.csv` });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast(t(`Exported ${rows.length} tasks as CSV`, `타스크 ${rows.length}개를 CSV로 내보냈어요`));
+});
+
+$("#exportMd").addEventListener("click", async () => {
+  const rows = exportRows();
+  const byProject = new Map();
+  for (const r of rows) {
+    const k = r.project || UNSORTED;
+    if (!byProject.has(k)) byProject.set(k, []);
+    byProject.get(k).push(r);
+  }
+  const out = [`# Duet — ${stamp()}`, ""];
+  for (const [proj, list] of byProject) {
+    out.push(`## ${proj}`, "");
+    for (const r of list) {
+      out.push(`- **${r.id} ${r.title}** · ${label(r.status)}`);
+      if (r.description) out.push(`  - ${r.description}`);
+      for (const l of r.logs.slice(-3)) out.push(`  - ${String(l.t).slice(5, 10)} ${l.msg}`);
+      if (r.summary) out.push(`  - ✔ ${r.summary}`);
+    }
+    out.push("");
+  }
+  const md = out.join("\n");
+  try {
+    await navigator.clipboard.writeText(md);
+    toast(t(`Copied ${rows.length} tasks as Markdown`, `타스크 ${rows.length}개를 마크다운으로 복사했어요`));
+  } catch {
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const a = el("a", { href: URL.createObjectURL(blob), download: `duet-${stamp()}.md` });
+    document.body.append(a); a.click(); a.remove();
+    toast(t("Clipboard blocked — downloaded as .md", "클립보드가 막혀 .md 파일로 내려받았어요"));
+  }
+});
+
 $("#archive").addEventListener("click", (e) => {
   archived = !archived;
   e.currentTarget.setAttribute("aria-pressed", String(archived));
