@@ -65,6 +65,41 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
 .acts{display:flex;gap:2px;align-items:center}
 
 .toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.vtabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:-4px 0 14px}
+.vtabs button{border:0;background:none;padding:9px 14px;font-size:14px;font-weight:600;color:var(--ink-3);cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit}
+.vtabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+/* ── 스프린트 타임라인 ── */
+.tl{background:var(--panel);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.tl-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line-2);background:var(--panel-2)}
+.tl-bar select{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:5px 8px;font:inherit;font-size:13px;color:var(--ink)}
+.tl-range{font-size:13px;font-weight:600;min-width:120px;text-align:center;font-variant-numeric:tabular-nums}
+.tl-body{overflow-x:auto}
+.tl-grid{min-width:720px;position:relative}
+.tl-row{display:grid;grid-template-columns:230px 1fr;align-items:center;min-height:30px;border-bottom:1px solid var(--line-2)}
+.tl-row:last-child{border-bottom:0}
+.tl-row.clickable{cursor:pointer}
+.tl-row.clickable:hover{background:var(--panel-2)}
+.tl-label{padding:5px 12px;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+.tl-label .tid{color:var(--ink-3);margin-right:6px;font-size:11.5px}
+.tl-label.grp{font-weight:700;color:var(--ink-2);font-size:12px;background:var(--panel-2)}
+.tl-track{position:relative;height:100%;min-height:30px}
+.tl-day{position:absolute;top:0;bottom:0;border-left:1px solid var(--line-2)}
+.tl-day.we{background:color-mix(in srgb,var(--line-2) 45%,transparent)}
+.tl-head .tl-track{min-height:28px}
+.tl-tick{position:absolute;top:7px;font-size:10.5px;color:var(--ink-3);transform:translateX(3px);white-space:nowrap;font-variant-numeric:tabular-nums}
+.tl-today{position:absolute;top:0;bottom:0;border-left:2px solid var(--확인필요);z-index:3;pointer-events:none}
+.tl-band{position:absolute;top:5px;bottom:5px;border-radius:6px;background:var(--진행중-bg);border:1px solid color-mix(in srgb,var(--진행중) 35%,transparent);
+  font-size:11.5px;color:var(--진행중);padding:0 8px;display:flex;align-items:center;gap:6px;overflow:hidden;white-space:nowrap;cursor:pointer}
+.tl-band.past{background:var(--panel-2);color:var(--ink-3);border-color:var(--line)}
+.tl-band.on{box-shadow:0 0 0 2px var(--accent)}
+.tl-seg{position:absolute;top:9px;bottom:9px;border-radius:4px;opacity:.28;z-index:1}
+.tl-act{position:absolute;top:9px;bottom:9px;border-radius:3px;z-index:2}
+.tl-run{position:absolute;top:13px;height:4px;border-radius:2px;z-index:1;opacity:.55;
+  background-image:repeating-linear-gradient(90deg,currentColor 0 5px,transparent 5px 9px)}
+.tl-empty{padding:40px 20px;text-align:center;color:var(--ink-3);font-size:13px}
+.tl-legend{display:flex;gap:14px;flex-wrap:wrap;padding:8px 14px;font-size:11.5px;color:var(--ink-3);border-top:1px solid var(--line-2)}
+.tl-legend i{display:inline-block;width:14px;height:8px;border-radius:2px;margin-right:5px;vertical-align:0}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 12px;font-size:12.5px;color:var(--ink-2);
       display:inline-flex;gap:6px;align-items:center}
@@ -203,13 +238,23 @@ dialog .note{margin:-4px 0 12px;font-size:12px;color:var(--ink-3)}
     </div>
   </header>
 
-  <div class="toolbar">
-    <div class="chips" id="chips"></div>
-    <div class="spacer"></div>
-    <input class="search" id="q" type="search" placeholder="Search">
+  <nav class="vtabs" role="tablist">
+    <button type="button" role="tab" data-view="tasks" id="tabTasks">Tasks</button>
+    <button type="button" role="tab" data-view="sprints" id="tabSprints">Sprints</button>
+  </nav>
+
+  <div id="viewTasks">
+    <div class="toolbar">
+      <div class="chips" id="chips"></div>
+      <div class="spacer"></div>
+      <input class="search" id="q" type="search" placeholder="Search">
+    </div>
+    <div class="grid" id="grid"></div>
   </div>
 
-  <div class="grid" id="grid"></div>
+  <div id="viewSprints" hidden>
+    <div class="tl" id="timeline"></div>
+  </div>
 </div>
 
 <!-- 새 프로젝트. 프로젝트는 첫 타스크와 함께 태어난다 — 빈 상자를 만들지 않는다. -->
@@ -291,7 +336,6 @@ const plural = (n, word) => LANG === "ko"
 let tasks = [];
 let projects = [];      // 타스크가 없는 프로젝트 폴더도 상자로 뜬다
 let sprints = {};       // 프로젝트 이름 → [{id, name, start, end}]
-const sprintView = new Map();  // 프로젝트 상자별로 보고 있는 스프린트: "*"(전체) | "S1" | NO_SPRINT
 const NO_SPRINT = "없음";
 let filter = ALL;
 let query = "";
@@ -325,6 +369,7 @@ const when = (stamp) => stamp ? stamp.replace("T", " ").split(".")[0].slice(5) :
   };
   if (LANG !== "ko") return;
   set("#feedback", "피드백");
+  set("#tabTasks", "타스크"); set("#tabSprints", "스프린트");
   document.querySelector("#exportCsv").title = "화면에 보이는 타스크를 CSV로 내려받기 (구글 시트·엑셀에서 열림)";
   set("#exportMd", "마크다운");
   document.querySelector("#exportMd").title = "화면에 보이는 타스크를 마크다운으로 복사";
@@ -554,8 +599,6 @@ function projectButtons(name, list) {
   }
   const out = [el("button", { className: "btn small", type: "button", textContent: t("+ Task", "+ 타스크"),
     onclick: () => openTaskDialog(name) })];
-  if (name) out.push(el("button", { className: "btn small", type: "button", textContent: t("+ Sprint", "+ 스프린트"),
-    onclick: () => openSprintDialog(name) }));
   // 살아 있는 세션이 있으면 서버가 거절한다. 여기서는 미리 숨기지 않고 이유를 토스트로 보여준다.
   out.push(el("button", { className: "btn small", type: "button", textContent: t("Archive", "보관"),
     title: t("Move the whole project folder to the archive. Nothing is deleted.",
@@ -577,15 +620,11 @@ function projectCard(name, list) {
       attention ? el("span", { className: "tag s-확인필요", textContent: t(`${attention} needs review`, `확인 필요 ${attention}`) }) : null,
       el("span", { className: "pc mono", textContent: plural(list.length, "task") }),
       el("span", { className: "acts" }, projectButtons(name, list)));
-  const inView = list.filter(inSprintView);
   const card = el("article", { className: "pcard" + (folded.has(key) ? " folded" : "") },
     head,
-    sprintBar(name, list),
-    inView.length
-      ? el("div", { className: "trows" }, inView.map(taskRow))
-      : el("div", { className: "pempty", textContent: list.length
-          ? t("No tasks in this sprint.", "이 스프린트에는 타스크가 없어요.")
-          : t("No tasks yet. Add one with + Task.", "아직 타스크가 없어요 — [+ 타스크]로 추가하세요.") }));
+    list.length
+      ? el("div", { className: "trows" }, list.map(taskRow))
+      : el("div", { className: "pempty", textContent: t("No tasks yet. Add one with + Task.", "아직 타스크가 없어요 — [+ 타스크]로 추가하세요.") }));
   // 머리 아무 데나 누르면 접힌다. 버튼(+ Task·Archive·×)은 자기 일만 한다.
   head.onclick = (e) => {
     if (e.target.closest("button")) return;
@@ -647,6 +686,7 @@ function draw() {
       : archived ? t("The archive is empty.", "보관함이 비어 있어요.")
                  : t("No projects yet. Start with + New Project.", "아직 프로젝트가 없어요 — [+ 새 프로젝트]로 시작하세요.") }),
   ]));
+  if (view === "sprints") drawTimeline();
 }
 
 /* ---------- 새로 읽기 ---------- */
@@ -712,18 +752,6 @@ function currentSprint(name) {
   const today = localDay();
   return projectSprints(name).find((sp) => sp.start <= today && today <= sp.end) || null;
 }
-function viewOf(name) {
-  const key = name || UNSORTED;
-  if (!sprintView.has(key)) { const cur = currentSprint(name); sprintView.set(key, cur ? cur.id : ALL); }
-  const v = sprintView.get(key);
-  // 지운 스프린트를 보고 있었으면 전체로
-  return v === ALL || v === NO_SPRINT || projectSprints(name).some((sp) => sp.id === v) ? v : ALL;
-}
-function inSprintView(task) {
-  if (!projectSprints(task.project).length) return true;
-  const v = viewOf(task.project);
-  return v === ALL || (v === NO_SPRINT ? !task.sprint : task.sprint === v);
-}
 function daysLabel(sp) {
   const today = localDay(), day = 86400000;
   if (today < sp.start) return t(`starts in ${Math.round((new Date(sp.start) - new Date(today)) / day)}d`, `${Math.round((new Date(sp.start) - new Date(today)) / day)}일 뒤 시작`);
@@ -733,41 +761,193 @@ function daysLabel(sp) {
 }
 const mmdd = (s) => s.slice(5).replace("-", "/");  // 2026-09-15 → 09/15
 
-function sprintBar(name, list) {
-  const spList = projectSprints(name);
-  if (!spList.length) return null;
-  const key = name || UNSORTED, v = viewOf(name), cur = currentSprint(name);
-  const pick = (id) => { sprintView.set(key, id); drawn = null; draw(); };
-  const chip = (id, label, meta, extra) => {
-    const b = el("button", { className: "spchip", type: "button" });
-    b.setAttribute("aria-pressed", String(v === id));
-    if (extra) b.append(extra);
-    b.append(el("span", { textContent: label }));
-    if (meta) b.append(el("span", { className: "spmeta", textContent: meta }));
-    b.onclick = () => pick(id);
-    return b;
-  };
-  const out = [chip(ALL, t("All", "전체"), String(list.length))];
-  for (const sp of spList) {
-    const mine = list.filter((x) => x.sprint === sp.id);
-    const done = mine.filter((x) => x.status === "완료").length;
-    const c = chip(sp.id, sp.name, `${mmdd(sp.start)}~${mmdd(sp.end)} · ${done}/${mine.length} · ${daysLabel(sp)}`,
-      cur && cur.id === sp.id ? el("span", { className: "spnow", title: t("current sprint", "진행 중인 스프린트") }) : null);
-    if (v === sp.id && !archived) {
-      c.append(el("button", { className: "spx", type: "button", textContent: "×", title: t("Delete sprint", "스프린트 삭제"),
-        onclick: async (e) => {
-          e.stopPropagation();
-          if (!confirm(t(`Delete sprint '${sp.name}'? Tasks stay — only the grouping goes.`,
-                         `'${sp.name}' 스프린트를 삭제할까요? 타스크는 그대로 남고 묶음만 사라집니다.`))) return;
-          try { await post("/api/sprints/delete", { project: name, id: sp.id }); sprintView.set(key, ALL); refresh(true); }
-          catch (err) { toast(err.message); }
-        } }));
-    }
-    out.push(c);
+/* ---------- 보기 탭: 타스크 / 스프린트 ---------- */
+
+let view = (() => { try { return localStorage.getItem("duet.view") === "sprints" ? "sprints" : "tasks"; } catch { return "tasks"; } })();
+function setView(v) {
+  view = v;
+  try { localStorage.setItem("duet.view", v); } catch {}
+  $("#viewTasks").hidden = v !== "tasks";
+  $("#viewSprints").hidden = v !== "sprints";
+  $("#tabTasks").setAttribute("aria-selected", String(v === "tasks"));
+  $("#tabSprints").setAttribute("aria-selected", String(v === "sprints"));
+  if (v === "sprints") drawTimeline();
+}
+$("#tabTasks").onclick = () => setView("tasks");
+$("#tabSprints").onclick = () => setView("sprints");
+
+/* ---------- 스프린트 타임라인 ---------- */
+// 날짜 축 하나에 스프린트 구간(띠)과 타스크 막대를 그린다.
+// 막대 = 첫 세션 시작 ~ 마지막 활동(진행 중이면 오늘). 그 안에서 실제로 세션이 있던 날은 진하게.
+
+const DAY_MS = 86400000;
+const addDays = (day, n) => localDay(new Date(new Date(day + "T00:00:00").getTime() + n * DAY_MS));
+const dayDiff = (a, b) => Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / DAY_MS);
+let tlProject = null;   // 프로젝트 이름 | ALL(전체 프로젝트)
+let tlRange = null;     // { start, end, sprint? }
+
+function taskSpan(task) {
+  if (!task.sessions.length) return null;   // 한 번도 손대지 않은 타스크는 막대가 없다
+  const start = task.started;
+  const running = task.status === "진행중";
+  const last = (task.last_activity || "").slice(0, 10) || start;
+  const end = running ? localDay() : (last < start ? start : last);
+  // 세션마다 시작일~마지막 하트비트일을 '손댄 날'로
+  const days = new Set();
+  for (const s of task.sessions) {
+    const a = (s.started || "").slice(0, 10), b = (s.heartbeat || s.started || "").slice(0, 10);
+    if (!a) continue;
+    for (let d = a; d <= (b < a ? a : b); d = addDays(d, 1)) days.add(d);
   }
-  const backlog = list.filter((x) => !x.sprint).length;
-  if (backlog) out.push(chip(NO_SPRINT, t("No sprint", "스프린트 밖"), String(backlog)));
-  return el("div", { className: "sprintbar" }, out);
+  return { start, end, running, days };
+}
+
+function tlProjects() {
+  const names = new Set(tasks.map((x) => x.project || ""));
+  return [...names].sort((a, b) => (!a ? 1 : !b ? -1 : a.localeCompare(b, "ko")));
+}
+function defaultRange(project) {
+  if (project !== ALL) {
+    const cur = currentSprint(project);
+    if (cur) return { start: cur.start, end: cur.end, sprint: cur.id };
+  }
+  return { start: addDays(localDay(), -13), end: localDay() };
+}
+
+function drawTimeline() {
+  const box = $("#timeline");
+  const names = tlProjects();
+  if (tlProject === null || (tlProject !== ALL && !names.includes(tlProject))) {
+    // 처음엔 스프린트가 있는 프로젝트 중 최근 것, 없으면 전체
+    tlProject = names.find((n) => projectSprints(n).length) ?? ALL;
+    tlRange = null;
+  }
+  if (!tlRange) tlRange = defaultRange(tlProject);
+  const { start, end } = tlRange;
+  const span = dayDiff(start, end) + 1;
+  const pct = (day) => (Math.max(0, Math.min(span, dayDiff(start, day))) / span) * 100;
+
+  // ── 상단 조작부 ──
+  const projSel = el("select", { title: t("Project", "프로젝트") },
+    el("option", { value: ALL, textContent: t("All projects", "전체 프로젝트"), selected: tlProject === ALL }),
+    ...names.map((n) => el("option", { value: n, textContent: n || UNSORTED, selected: tlProject === n })));
+  projSel.onchange = () => { tlProject = projSel.value; tlRange = null; drawTimeline(); };
+  const shift = (dir) => {
+    const len = span;
+    tlRange = { start: addDays(start, dir * len), end: addDays(end, dir * len) };
+    drawTimeline();
+  };
+  const spList = tlProject === ALL ? [] : projectSprints(tlProject);
+  const rangeChips = [
+    el("button", { className: "btn small", type: "button", textContent: t("2 weeks", "최근 2주"),
+      "aria-pressed": String(!tlRange.sprint && end === localDay() && span === 14),
+      onclick: () => { tlRange = { start: addDays(localDay(), -13), end: localDay() }; drawTimeline(); } }),
+    ...spList.map((sp) => {
+      const b = el("button", { className: "btn small", type: "button", textContent: sp.name,
+        title: `${sp.start} ~ ${sp.end}`,
+        onclick: () => { tlRange = { start: sp.start, end: sp.end, sprint: sp.id }; drawTimeline(); } });
+      b.setAttribute("aria-pressed", String(tlRange.sprint === sp.id));
+      return b;
+    }),
+  ];
+  rangeChips[0].setAttribute("aria-pressed", String(!tlRange.sprint && end === localDay() && span === 14));
+  const bar = el("div", { className: "tl-bar" },
+    projSel,
+    el("button", { className: "btn small", type: "button", textContent: "◀", onclick: () => shift(-1) }),
+    el("span", { className: "tl-range", textContent: `${mmdd(start)} ~ ${mmdd(end)}` }),
+    el("button", { className: "btn small", type: "button", textContent: "▶", onclick: () => shift(1) }),
+    ...rangeChips,
+    el("span", { className: "spacer" }),
+    tlProject !== ALL && !archived
+      ? el("button", { className: "btn small", type: "button", textContent: t("+ Sprint", "+ 스프린트"), onclick: () => openSprintDialog(tlProject) })
+      : null,
+    tlRange.sprint && !archived
+      ? el("button", { className: "btn small", type: "button", textContent: t("Delete sprint", "스프린트 삭제"),
+          onclick: async () => {
+            const sp = spList.find((x) => x.id === tlRange.sprint);
+            if (!sp || !confirm(t(`Delete sprint '${sp.name}'? Tasks stay — only the grouping goes.`,
+                                  `'${sp.name}' 스프린트를 삭제할까요? 타스크는 그대로 남고 묶음만 사라집니다.`))) return;
+            try { await post("/api/sprints/delete", { project: tlProject, id: sp.id }); tlRange = null; refresh(true); }
+            catch (err) { toast(err.message); }
+          } })
+      : null);
+
+  // ── 격자 ──
+  const dayCols = [];
+  const every = span <= 21 ? 1 : span <= 45 ? 7 : 14;
+  for (let i = 0; i < span; i++) {
+    const d = addDays(start, i), dow = new Date(d + "T00:00:00").getDay();
+    dayCols.push({ d, left: (i / span) * 100, we: dow === 0 || dow === 6, tick: i % every === 0 });
+  }
+  const today = localDay();
+  const todayLine = () => (today >= start && today <= end)
+    ? el("div", { className: "tl-today", style: `left:${pct(today) + 50 / span}%` }) : null;
+  const trackBg = () => dayCols.map((c) => el("div", { className: "tl-day" + (c.we ? " we" : ""), style: `left:${c.left}%;width:${100 / span}%` }));
+  const row = (labelNode, children, opts = {}) => {
+    const r = el("div", { className: "tl-row" + (opts.click ? " clickable" : "") + (opts.cls ? " " + opts.cls : "") },
+      labelNode, el("div", { className: "tl-track" }, ...trackBg(), ...children, todayLine()));
+    if (opts.click) r.onclick = opts.click;
+    if (opts.title) r.title = opts.title;
+    return r;
+  };
+
+  const rows = [];
+  rows.push(row(el("div", { className: "tl-label", textContent: "" }),
+    dayCols.filter((c) => c.tick).map((c) => el("span", { className: "tl-tick", style: `left:${c.left}%`, textContent: mmdd(c.d) })),
+    { cls: "tl-head" }));
+
+  const inRange = (x) => { const sp = taskSpan(x); return sp && sp.start <= end && sp.end >= start ? sp : null; };
+  const groups = tlProject === ALL ? tlProjects() : [tlProject];
+  let shownCount = 0;
+  for (const g of groups) {
+    const list = tasks.filter((x) => (x.project || "") === g).map((x) => [x, inRange(x)]).filter(([, s]) => s)
+      .sort((a, b) => a[1].start.localeCompare(b[1].start) || a[0].id.localeCompare(b[0].id));
+    const bands = projectSprints(g).filter((sp) => sp.start <= end && sp.end >= start);
+    if (!list.length && !bands.length) continue;
+    if (tlProject === ALL) rows.push(row(el("div", { className: "tl-label grp", textContent: g || UNSORTED }), []));
+    if (bands.length) {
+      rows.push(row(el("div", { className: "tl-label", textContent: t("Sprints", "스프린트") }),
+        bands.map((sp) => {
+          const mine = tasks.filter((x) => (x.project || "") === g && x.sprint === sp.id);
+          const done = mine.filter((x) => x.status === "완료").length;
+          const l = pct(sp.start), r = pct(addDays(sp.end, 1));
+          const b = el("div", { className: "tl-band" + (sp.end < today ? " past" : "") + (tlRange.sprint === sp.id ? " on" : ""),
+            style: `left:${l}%;width:${Math.max(r - l, 0.5)}%`,
+            title: `${sp.name} · ${sp.start} ~ ${sp.end} · ${done}/${mine.length}`,
+            textContent: `${sp.name} · ${done}/${mine.length} · ${daysLabel(sp)}` });
+          b.onclick = (e) => { e.stopPropagation(); tlProject = g; tlRange = { start: sp.start, end: sp.end, sprint: sp.id }; drawTimeline(); };
+          return b;
+        })));
+    }
+    for (const [x, s] of list) {
+      shownCount++;
+      const color = `var(--${slug(x.status)})`;
+      const l = pct(s.start), r = pct(addDays(s.end, 1));
+      const parts = [el("div", { className: "tl-seg", style: `left:${l}%;width:${Math.max(r - l, 100 / span / 2)}%;background:${color}` })];
+      for (const d of s.days) {
+        if (d < start || d > end) continue;
+        parts.push(el("div", { className: "tl-act", style: `left:${pct(d) + 8 / span}%;width:${84 / span}%;background:${color}` }));
+      }
+      if (s.running) parts.push(el("div", { className: "tl-run", style: `left:${pct(s.start)}%;width:${r - pct(s.start)}%;color:${color}` }));
+      rows.push(row(
+        el("div", { className: "tl-label" }, el("span", { className: "tid mono", textContent: x.id }), document.createTextNode(x.title)),
+        parts,
+        { title: `[${x.ref}] ${x.title} · ${label(x.status)} · ${s.start} ~ ${s.running ? t("now", "진행 중") : s.end} · ${t(`${x.sessions.length} sessions`, `세션 ${x.sessions.length}개`)}`,
+          click: () => { opened.add(x.ref); filter = ALL; query = ""; $("#q").value = ""; drawn = null; setView("tasks"); draw();
+            setTimeout(() => { const n = [...document.querySelectorAll(".trow")].find((e) => e.querySelector(".tid")?.textContent === x.id && e.closest(".pcard")?.querySelector("h2")?.textContent.includes(x.project || UNSORTED)); if (n) n.scrollIntoView({ block: "center" }); }, 50); } }));
+    }
+  }
+
+  const body = shownCount || rows.length > 1
+    ? el("div", { className: "tl-body" }, el("div", { className: "tl-grid" }, ...rows))
+    : el("div", { className: "tl-empty", textContent: t("No work in this period. Move with ◀ ▶ or pick another project.",
+                                                         "이 기간에 한 일이 없어요. ◀ ▶로 옮기거나 다른 프로젝트를 골라 보세요.") });
+  const legend = el("div", { className: "tl-legend" },
+    el("span", {}, el("i", { style: "background:var(--완료)" }), document.createTextNode(t("days worked", "세션이 있던 날"))),
+    el("span", {}, el("i", { style: "background:var(--완료);opacity:.28" }), document.createTextNode(t("task span", "타스크 기간"))),
+    el("span", {}, el("i", { style: "background:var(--확인필요);width:2px" }), document.createTextNode(t("today", "오늘"))),
+    el("span", { textContent: t("Click a bar to open the task.", "막대를 누르면 타스크 탭에서 열립니다.") }));
+  box.replaceChildren(bar, body, legend);
 }
 
 function sprintSelect(task) {
@@ -807,14 +987,19 @@ $("#frmSprint").addEventListener("submit", async (e) => {
   try {
     const sp = await post("/api/sprints", { project: newSprintProject, name: $("#sName").value, start: $("#sStart").value, end: $("#sEnd").value });
     $("#dlgSprint").close();
-    sprintView.set(newSprintProject || UNSORTED, sp.id);
+    tlProject = newSprintProject; tlRange = { start: sp.start, end: sp.end, sprint: sp.id };
     toast(t(`Sprint '${sp.name}' created`, `'${sp.name}' 스프린트를 만들었어요`));
     refresh(true);
   } catch (err) { toast(err.message); }
 });
 
 function exportRows() {
-  return visibleTasks().filter(inSprintView).map((x) => {
+  // 스프린트 탭에서는 타임라인에 보이는 것(프로젝트·기간), 타스크 탭에서는 칩·검색이 적용된 것
+  const source = view === "sprints" && tlRange
+    ? tasks.filter((x) => (tlProject === ALL || (x.project || "") === tlProject)
+        && (() => { const s = taskSpan(x); return s && s.start <= tlRange.end && s.end >= tlRange.start; })())
+    : visibleTasks();
+  return source.map((x) => {
     const sessions = x.sessions || [];
     const logs = sessions.flatMap((s) => (s.progress || []).map((p) => ({ t: p.t, msg: p.msg })))
       .sort((a, b) => String(a.t).localeCompare(String(b.t)));
@@ -946,6 +1131,7 @@ $("#frmFeedback").addEventListener("submit", (e) => {
   $("#dlgFeedback").close();
 });
 
+setView(view);
 refresh();
 
 // 폴더가 바뀔 때만 다시 읽는다. 서버가 /api/events로 알려준다.
