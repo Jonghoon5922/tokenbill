@@ -44,7 +44,11 @@ const CLOSED = [DONE, STOPPED];
 const TASK_DIR = /^(T\d{3,})(?:-.*)?$/;
 const STATUS_LINE = /^상태:\s*(\S+)\s*$/m;
 const PROJECT_LINE = /^프로젝트:\s*(.+?)\s*$/m;
-const META_LINE = /^(?:상태|프로젝트):\s*.*$/;
+const META_LINE = /^(?:상태|프로젝트|스프린트):\s*.*$/;
+const SPRINT_LINE = /^스프린트:\s*(\S+)\s*$/m;
+const SPRINTS_FILENAME = "sprints.json";
+const NO_SPRINT = "없음";   // 스프린트에서 뺀 타스크 (백로그)
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const NOT_PROJECT = new Set(["", "/", "\\", "system32", "windows", "desktop", "바탕 화면", "temp", "tmp"]);
 const TEMP_FOLDER = /^(scratch|tmp|temp)[-_.]/i;
 const BAD_CHARS = /[<>:"/\\|?*\x00-\x1f]/g;
@@ -125,8 +129,26 @@ function readSessions(dir) {
 // ── 타스크 ────────────────────────────────────────────────────
 
 class Task {
-  constructor({ id, title, description, override, dir, sessions }) {
-    Object.assign(this, { id, title, description, override, dir, sessions: sessions || [] });
+  constructor({ id, title, description, override, sprintPin, dir, sessions }) {
+    Object.assign(this, { id, title, description, override, sprintPin: sprintPin || null, dir, sessions: sessions || [] });
+  }
+  /** 타스크가 시작된 날 — 첫 세션이 붙은 날, 세션이 없으면 폴더가 만들어진 날. 스프린트 배정의 기준. */
+  get started() {
+    const first = this.sessions.map((x) => x.started).filter(Boolean).sort()[0];
+    if (first) return first.slice(0, 10);
+    try {
+      const d = fs.statSync(this.dir).birthtime;
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    } catch { return ""; }
+  }
+  /** 사람이 옮겨 둔 스프린트가 있으면 그것, 없으면 시작일이 기간에 드는 스프린트, 둘 다 아니면 "". */
+  get sprint() {
+    if (this.sprintPin === NO_SPRINT) return "";
+    const list = readSprints(path.dirname(this.dir));
+    if (this.sprintPin && list.some((sp) => sp.id === this.sprintPin)) return this.sprintPin;
+    const day = this.started;
+    const hit = day && list.find((sp) => sp.start <= day && day <= sp.end);
+    return hit ? hit.id : "";
   }
   get project() { const n = path.basename(path.dirname(this.dir)); return n === UNSORTED_DIRNAME ? "" : n; }
   get ref() { return `${this.project || UNSORTED_DIRNAME}/${this.id}`; }
@@ -152,7 +174,8 @@ class Task {
   }
   toDict() {
     return { id: this.id, ref: this.ref, project: this.project, title: this.title, status: this.status,
-      counts: this.counts, override: this.override, warning: this.warning, last_activity: this.lastActivity };
+      counts: this.counts, override: this.override, warning: this.warning, last_activity: this.lastActivity,
+      sprint: this.sprint, sprint_pin: this.sprintPin, started: this.started };
   }
   toDetail() {
     return { ...this.toDict(), description: this.description, folder: this.dir, sessions: this.sessions.map((s) => s.toDict()) };
@@ -167,16 +190,25 @@ function readTask(dir) {
     const written = m[1] === STOPPED ? HOLD : m[1];
     if (HUMAN_STATUSES.includes(written)) override = written;
   }
+  const pin = SPRINT_LINE.exec(text);
   const lines = text.split(/\r?\n/).filter((ln) => !META_LINE.test(ln));
   const title = lines.length ? lines[0].replace(/^#\s*/, "").trim() : path.basename(dir);
   return new Task({
     id: TASK_DIR.exec(path.basename(dir))[1], title,
-    description: lines.slice(1).join("\n").trim(), override, dir, sessions: readSessions(dir),
+    description: lines.slice(1).join("\n").trim(), override, sprintPin: pin ? pin[1] : null, dir, sessions: readSessions(dir),
   });
 }
-function writeTask(dir, title, description, override) {
+function writeTask(dir, title, description, override, sprintPin) {
+  // sprintPin을 넘기지 않으면 원래 적혀 있던 줄을 지킨다 — 제목·상태를 고칠 때 스프린트가 풀리지 않게.
+  if (sprintPin === undefined) {
+    try {
+      const m = SPRINT_LINE.exec(fs.readFileSync(path.join(dir, "task.md"), "utf8"));
+      sprintPin = m ? m[1] : null;
+    } catch { sprintPin = null; }
+  }
   const out = [`# ${title}`];
   if (override) out.push(`상태: ${override}`);
+  if (sprintPin) out.push(`스프린트: ${sprintPin}`);
   out.push("", (description || "").trim(), "");
   fs.writeFileSync(path.join(dir, "task.md"), out.join("\n"), "utf8");
 }
@@ -309,6 +341,79 @@ function setStatus(ref, status, hint) {
   }
   const task = getTask(ref, hint);
   writeTask(task.dir, task.title, task.description, status || null);
+  return readTask(task.dir);
+}
+
+// ── 스프린트 ──────────────────────────────────────────────────
+// 프로젝트 폴더의 sprints.json 한 파일. 기간에 맞는 타스크는 아무것도 안 적고 날짜로 들어가며,
+// 사람이 다른 스프린트로 옮겼을 때만 task.md에 `스프린트: S2` 한 줄이 생긴다.
+
+function readSprints(projectFolder) {
+  try {
+    const list = JSON.parse(fs.readFileSync(path.join(projectFolder, SPRINTS_FILENAME), "utf8"));
+    return Array.isArray(list) ? list.filter((x) => x && x.id && DAY.test(x.start) && DAY.test(x.end)) : [];
+  } catch { return []; }
+}
+function writeSprints(projectFolder, list) {
+  fs.mkdirSync(projectFolder, { recursive: true });
+  list.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+  fs.writeFileSync(path.join(projectFolder, SPRINTS_FILENAME), JSON.stringify(list, null, 2) + "\n", "utf8");
+}
+function checkPeriod(list, start, end, exceptId) {
+  if (!DAY.test(start || "") || !DAY.test(end || "")) throw new DuetError("기간은 YYYY-MM-DD 형식으로 적는다.");
+  if (start > end) throw new DuetError("끝나는 날이 시작일보다 앞이다.");
+  const clash = list.find((sp) => sp.id !== exceptId && sp.start <= end && start <= sp.end);
+  if (clash) throw new DuetError(`기간이 '${clash.name}'(${clash.start}~${clash.end})와 겹친다.`);
+}
+function listSprints(project) { return readSprints(projectDir(project)); }
+function allSprints() {
+  const out = {};
+  for (const p of projectDirs()) {
+    const list = readSprints(p);
+    if (list.length) out[path.basename(p) === UNSORTED_DIRNAME ? "" : path.basename(p)] = list;
+  }
+  return out;
+}
+function createSprint(project, { name, start, end } = {}) {
+  if (!(project || "").trim()) throw new DuetError("스프린트는 프로젝트 안에 만든다 — 프로젝트를 정해라.");
+  const folder = projectDir(project), list = readSprints(folder);
+  checkPeriod(list, start, end, null);
+  const next = list.reduce((n, sp) => Math.max(n, Number(String(sp.id).slice(1)) || 0), 0) + 1;
+  const sprint = { id: `S${next}`, name: (name || "").trim() || `스프린트 ${next}`, start, end };
+  writeSprints(folder, [...list, sprint]);
+  return sprint;
+}
+function updateSprint(project, id, { name, start, end } = {}) {
+  const folder = projectDir(project), list = readSprints(folder);
+  const sp = list.find((x) => x.id === id);
+  if (!sp) throw new DuetError(`스프린트가 없다: ${id}`);
+  const next = { ...sp, name: name == null ? sp.name : (name.trim() || sp.name),
+    start: start == null ? sp.start : start, end: end == null ? sp.end : end };
+  checkPeriod(list, next.start, next.end, id);
+  writeSprints(folder, list.map((x) => (x.id === id ? next : x)));
+  return next;
+}
+function deleteSprint(project, id) {
+  const folder = projectDir(project), list = readSprints(folder);
+  if (!list.some((x) => x.id === id)) throw new DuetError(`스프린트가 없다: ${id}`);
+  writeSprints(folder, list.filter((x) => x.id !== id));
+  // 이 스프린트로 옮겨 둔 타스크는 다시 날짜를 따라가게 푼다
+  for (const d of taskDirsIn(folder)) {
+    const t = safeRead(d);
+    if (t && t.sprintPin === id) writeTask(d, t.title, t.description, t.override, null);
+  }
+  return id;
+}
+/** 타스크를 스프린트로 옮긴다. NO_SPRINT면 스프린트에서 빼고, null이면 다시 날짜를 따른다. */
+function setTaskSprint(ref, sprint, hint) {
+  const task = getTask(ref, hint);
+  if (sprint && sprint !== NO_SPRINT && !readSprints(path.dirname(task.dir)).some((x) => x.id === sprint)) {
+    throw new DuetError(`이 프로젝트에 그런 스프린트가 없다: ${sprint}`);
+  }
+  // 날짜로 저절로 들어가는 스프린트를 고른 것이면 굳이 적어 두지 않는다
+  let pin = sprint || null;
+  if (pin && pin !== NO_SPRINT && new Task({ ...task, sprintPin: null }).sprint === pin) pin = null;
+  writeTask(task.dir, task.title, task.description, task.override, pin);
   return readTask(task.dir);
 }
 
@@ -507,4 +612,5 @@ module.exports = {
   findTask, getTask, createTask, listTasks, projects, similarTasks, updateTask, setStatus,
   aliases, projectName, registerSession, join, taskOf, heartbeat, report, finish, setSessionStatus,
   projectTasks, listArchived, archiveProject, unarchiveProject, deleteTask, deleteProject, reap, fingerprint,
+  NO_SPRINT, listSprints, allSprints, createSprint, updateSprint, deleteSprint, setTaskSprint,
 };

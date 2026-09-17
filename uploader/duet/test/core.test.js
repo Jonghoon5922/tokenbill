@@ -139,3 +139,39 @@ test("Python 판이 쓴 세션 파일을 그대로 읽는다", () => {
   assert.equal(read.status, core.DONE);
   assert.equal(read.sessions[0].progress[0].msg, "반");
 });
+
+test("스프린트: 시작일이 기간에 들면 저절로 묶이고, 겹치는 기간은 거절한다", () => {
+  const today = core.now().slice(0, 10);
+  const t = core.createTask("일", "", "p");
+  const s1 = core.createSprint("p", { name: "이번", start: today, end: today });
+  assert.equal(core.getTask(t.ref).sprint, s1.id);
+  assert.throws(() => core.createSprint("p", { start: today, end: today }), /겹친다/);
+  assert.throws(() => core.createSprint("p", { start: "2099-01-07", end: "2099-01-01" }), /앞이다/);
+});
+
+test("스프린트: 옮기면 한 줄로 남고, 상태를 바꿔도 풀리지 않으며, 스프린트를 지우면 풀린다", () => {
+  const today = core.now().slice(0, 10);
+  const t = core.createTask("일", "", "p");
+  core.createSprint("p", { name: "이번", start: today, end: today });
+  const later = core.createSprint("p", { name: "나중", start: "2099-01-01", end: "2099-01-07" });
+  core.setTaskSprint(t.ref, later.id);
+  assert.match(fs.readFileSync(path.join(t.dir, "task.md"), "utf8"), /^스프린트: S2$/m);
+  core.setStatus(t.ref, core.DONE);
+  let read = core.getTask(t.ref);
+  assert.equal(read.sprint, later.id);
+  assert.equal(read.title, "일");
+  core.deleteSprint("p", later.id);
+  read = core.getTask(t.ref);
+  assert.equal(read.sprintPin, null);
+  assert.equal(read.sprint, "S1");
+});
+
+test("스프린트: 날짜로 들어갈 곳을 고르면 적지 않고, '없음'이면 스프린트 밖이다", () => {
+  const today = core.now().slice(0, 10);
+  const t = core.createTask("일", "", "p");
+  const s1 = core.createSprint("p", { name: "이번", start: today, end: today });
+  core.setTaskSprint(t.ref, s1.id);
+  assert.equal(core.getTask(t.ref).sprintPin, null);
+  core.setTaskSprint(t.ref, core.NO_SPRINT);
+  assert.equal(core.getTask(t.ref).sprint, "");
+});

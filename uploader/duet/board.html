@@ -153,7 +153,16 @@ dialog .note{margin:-4px 0 12px;font-size:12px;color:var(--ink-3)}
 .phead h2 .caret{display:inline-block;font-size:10px;color:var(--ink-3);transition:transform .15s}
 .pcard.folded .phead{border-bottom:0}
 .pcard.folded .phead h2 .caret{transform:rotate(-90deg)}
-.pcard.folded .trows,.pcard.folded .pempty{display:none}
+.pcard.folded .trows,.pcard.folded .pempty,.pcard.folded .sprintbar{display:none}
+.sprintbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line-2)}
+.spchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:999px;
+  padding:3px 10px;font-size:12px;cursor:pointer;color:var(--ink-2);font-family:inherit}
+.spchip[aria-pressed="true"]{border-color:var(--ink);color:var(--ink);font-weight:600}
+.spchip .spmeta{color:var(--ink-3);font-weight:400;font-size:11px}
+.spchip .spnow{width:6px;height:6px;border-radius:50%;background:var(--진행중)}
+.spchip .spx{border:0;background:none;color:var(--ink-3);cursor:pointer;padding:0 0 0 2px;font-size:13px;line-height:1}
+.spsel{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:3px 6px;font-size:11.5px;color:var(--ink-2);
+  max-width:120px;font-family:inherit}
 .pc{font-size:12px;color:var(--ink-3)}
 .pempty{padding:14px 16px;color:var(--ink-3);font-size:12.5px}
 
@@ -229,6 +238,20 @@ dialog .note{margin:-4px 0 12px;font-size:12px;color:var(--ink-3)}
     </div>
   </form>
 </dialog>
+<!-- 새 스프린트. 기간만 정하면 그 기간에 시작한 타스크가 저절로 묶인다. -->
+<dialog id="dlgSprint">
+  <form id="frmSprint">
+    <h2 id="sHead">New Sprint</h2>
+    <div class="field"><label for="sName">Name</label><input id="sName" placeholder="e.g. Sep week 3" autocomplete="off"></div>
+    <div class="field"><label for="sStart">Start</label><input id="sStart" type="date" required></div>
+    <div class="field"><label for="sEnd">End</label><input id="sEnd" type="date" required></div>
+    <p class="note" id="sNote">Tasks started within this period join the sprint automatically.</p>
+    <div class="actions">
+      <button type="button" class="btn" id="sCancel">Cancel</button>
+      <button type="submit" class="btn primary">Create</button>
+    </div>
+  </form>
+</dialog>
 <!-- 피드백 = GitHub 이슈. 여기서 적은 글을 새 이슈 화면에 채워서 연다. 보내는 것은 브라우저다. -->
 <dialog id="dlgFeedback">
   <form id="frmFeedback">
@@ -267,6 +290,9 @@ const plural = (n, word) => LANG === "ko"
   : `${n} ${word}${n === 1 ? "" : "s"}`;
 let tasks = [];
 let projects = [];      // 타스크가 없는 프로젝트 폴더도 상자로 뜬다
+let sprints = {};       // 프로젝트 이름 → [{id, name, start, end}]
+const sprintView = new Map();  // 프로젝트 상자별로 보고 있는 스프린트: "*"(전체) | "S1" | NO_SPRINT
+const NO_SPRINT = "없음";
 let filter = ALL;
 let query = "";
 let archived = false;   // 보관함을 보고 있나
@@ -315,6 +341,10 @@ const when = (stamp) => stamp ? stamp.replace("T", " ").split(".")[0].slice(5) :
   lab("tTitle", "제목"); ph("#tTitle", "예: pc101pm 전환");
   lab("tDesc", "설명 (선택)"); ph("#tDesc", "무슨 일인지 한 줄");
   set("#tCancel", "취소"); set("#frmTask .primary", "만들기");
+  lab("sName", "이름"); ph("#sName", "예: 9월 3주차");
+  lab("sStart", "시작일"); lab("sEnd", "종료일");
+  set("#sNote", "이 기간에 시작한 타스크가 자동으로 묶입니다.");
+  set("#sCancel", "취소"); set("#frmSprint .primary", "만들기");
   set("#dlgFeedback h2", "피드백");
   lab("fbTitle", "제목"); ph("#fbTitle", "불편한 점, 있었으면 하는 것");
   lab("fbBody", "내용 (선택)"); ph("#fbBody", "무엇을 했고, 무엇을 기대했고, 어떻게 됐는지");
@@ -466,6 +496,7 @@ function taskRow(task) {
       el("span", { className: "tid mono", textContent: task.id }),
       title,
       task.warning ? el("span", { className: "warn-dot", title: task.warning, textContent: "⚠" }) : null,
+      sprintSelect(task),
       sel,
       busyTask(task) || archived ? null : xButton(t("Delete task", "타스크 삭제"), () => deleteTask(task))),
     el("div", { className: "tbody" },
@@ -523,6 +554,8 @@ function projectButtons(name, list) {
   }
   const out = [el("button", { className: "btn small", type: "button", textContent: t("+ Task", "+ 타스크"),
     onclick: () => openTaskDialog(name) })];
+  if (name) out.push(el("button", { className: "btn small", type: "button", textContent: t("+ Sprint", "+ 스프린트"),
+    onclick: () => openSprintDialog(name) }));
   // 살아 있는 세션이 있으면 서버가 거절한다. 여기서는 미리 숨기지 않고 이유를 토스트로 보여준다.
   out.push(el("button", { className: "btn small", type: "button", textContent: t("Archive", "보관"),
     title: t("Move the whole project folder to the archive. Nothing is deleted.",
@@ -544,11 +577,15 @@ function projectCard(name, list) {
       attention ? el("span", { className: "tag s-확인필요", textContent: t(`${attention} needs review`, `확인 필요 ${attention}`) }) : null,
       el("span", { className: "pc mono", textContent: plural(list.length, "task") }),
       el("span", { className: "acts" }, projectButtons(name, list)));
+  const inView = list.filter(inSprintView);
   const card = el("article", { className: "pcard" + (folded.has(key) ? " folded" : "") },
     head,
-    list.length
-      ? el("div", { className: "trows" }, list.map(taskRow))
-      : el("div", { className: "pempty", textContent: t("No tasks yet. Add one with + Task.", "아직 타스크가 없어요 — [+ 타스크]로 추가하세요.") }));
+    sprintBar(name, list),
+    inView.length
+      ? el("div", { className: "trows" }, inView.map(taskRow))
+      : el("div", { className: "pempty", textContent: list.length
+          ? t("No tasks in this sprint.", "이 스프린트에는 타스크가 없어요.")
+          : t("No tasks yet. Add one with + Task.", "아직 타스크가 없어요 — [+ 타스크]로 추가하세요.") }));
   // 머리 아무 데나 누르면 접힌다. 버튼(+ Task·Archive·×)은 자기 일만 한다.
   head.onclick = (e) => {
     if (e.target.closest("button")) return;
@@ -636,11 +673,12 @@ async function refresh(force = false) {
     $("#archive").textContent = archived ? t("← Board", "← 보드")
       : (data.archived ? t(`Archived ${data.archived}`, `보관함 ${data.archived}`) : t("Archived", "보관함"));
 
-    const shape = JSON.stringify([archived, data.projects, data.tasks]);
+    const shape = JSON.stringify([archived, data.projects, data.tasks, data.sprints]);
     if (!force && (busy() || shape === drawn)) return;
     drawn = shape;
     tasks = data.tasks;
     projects = data.projects || [];
+    sprints = data.sprints || {};
     draw();
   } catch (e) {
     $("#pulse").classList.remove("on");
@@ -662,14 +700,128 @@ function visibleTasks() {
   return tasks.filter((t) => (filter === ALL || t.status === filter) && hit(t));
 }
 
+/* ---------- 스프린트 ---------- */
+
+function localDay(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+const projectSprints = (name) => sprints[name || ""] || [];
+const sprintName = (name, id) => (projectSprints(name).find((sp) => sp.id === id) || {}).name || "";
+// 오늘이 든 스프린트 — 상자를 처음 열면 이것부터 보여준다
+function currentSprint(name) {
+  const today = localDay();
+  return projectSprints(name).find((sp) => sp.start <= today && today <= sp.end) || null;
+}
+function viewOf(name) {
+  const key = name || UNSORTED;
+  if (!sprintView.has(key)) { const cur = currentSprint(name); sprintView.set(key, cur ? cur.id : ALL); }
+  const v = sprintView.get(key);
+  // 지운 스프린트를 보고 있었으면 전체로
+  return v === ALL || v === NO_SPRINT || projectSprints(name).some((sp) => sp.id === v) ? v : ALL;
+}
+function inSprintView(task) {
+  if (!projectSprints(task.project).length) return true;
+  const v = viewOf(task.project);
+  return v === ALL || (v === NO_SPRINT ? !task.sprint : task.sprint === v);
+}
+function daysLabel(sp) {
+  const today = localDay(), day = 86400000;
+  if (today < sp.start) return t(`starts in ${Math.round((new Date(sp.start) - new Date(today)) / day)}d`, `${Math.round((new Date(sp.start) - new Date(today)) / day)}일 뒤 시작`);
+  if (today > sp.end) return t("ended", "종료");
+  const left = Math.round((new Date(sp.end) - new Date(today)) / day);
+  return left === 0 ? t("last day", "오늘 마감") : `D-${left}`;
+}
+const mmdd = (s) => s.slice(5).replace("-", "/");  // 2026-09-15 → 09/15
+
+function sprintBar(name, list) {
+  const spList = projectSprints(name);
+  if (!spList.length) return null;
+  const key = name || UNSORTED, v = viewOf(name), cur = currentSprint(name);
+  const pick = (id) => { sprintView.set(key, id); drawn = null; draw(); };
+  const chip = (id, label, meta, extra) => {
+    const b = el("button", { className: "spchip", type: "button" });
+    b.setAttribute("aria-pressed", String(v === id));
+    if (extra) b.append(extra);
+    b.append(el("span", { textContent: label }));
+    if (meta) b.append(el("span", { className: "spmeta", textContent: meta }));
+    b.onclick = () => pick(id);
+    return b;
+  };
+  const out = [chip(ALL, t("All", "전체"), String(list.length))];
+  for (const sp of spList) {
+    const mine = list.filter((x) => x.sprint === sp.id);
+    const done = mine.filter((x) => x.status === "완료").length;
+    const c = chip(sp.id, sp.name, `${mmdd(sp.start)}~${mmdd(sp.end)} · ${done}/${mine.length} · ${daysLabel(sp)}`,
+      cur && cur.id === sp.id ? el("span", { className: "spnow", title: t("current sprint", "진행 중인 스프린트") }) : null);
+    if (v === sp.id && !archived) {
+      c.append(el("button", { className: "spx", type: "button", textContent: "×", title: t("Delete sprint", "스프린트 삭제"),
+        onclick: async (e) => {
+          e.stopPropagation();
+          if (!confirm(t(`Delete sprint '${sp.name}'? Tasks stay — only the grouping goes.`,
+                         `'${sp.name}' 스프린트를 삭제할까요? 타스크는 그대로 남고 묶음만 사라집니다.`))) return;
+          try { await post("/api/sprints/delete", { project: name, id: sp.id }); sprintView.set(key, ALL); refresh(true); }
+          catch (err) { toast(err.message); }
+        } }));
+    }
+    out.push(c);
+  }
+  const backlog = list.filter((x) => !x.sprint).length;
+  if (backlog) out.push(chip(NO_SPRINT, t("No sprint", "스프린트 밖"), String(backlog)));
+  return el("div", { className: "sprintbar" }, out);
+}
+
+function sprintSelect(task) {
+  const spList = projectSprints(task.project);
+  if (!spList.length || archived) return null;
+  const sel = el("select", { className: "spsel", title: t("Sprint — auto by start date, pick to move", "스프린트 — 시작일로 자동 배정, 고르면 옮겨집니다") });
+  for (const sp of spList) sel.append(el("option", { value: sp.id, textContent: sp.name, selected: task.sprint === sp.id }));
+  sel.append(el("option", { value: NO_SPRINT, textContent: t("No sprint", "스프린트 밖"), selected: !task.sprint }));
+  sel.onclick = (e) => e.stopPropagation();
+  sel.onchange = async () => {
+    try {
+      await post(`/api/tasks/${task.ref}/sprint`, { sprint: sel.value });
+      toast(`${task.id} → ${sel.value === NO_SPRINT ? t("no sprint", "스프린트 밖") : sprintName(task.project, sel.value)}`);
+      refresh(true);
+    } catch (e) { toast(e.message); }
+  };
+  return sel;
+}
+
+function openSprintDialog(project) {
+  newSprintProject = project;
+  $("#frmSprint").reset();
+  // 기본값: 마지막 스프린트 다음 날부터 2주, 없으면 오늘부터 2주
+  const last = projectSprints(project).slice(-1)[0];
+  const start = last && last.end >= localDay() ? new Date(new Date(last.end).getTime() + 86400000) : new Date();
+  const end = new Date(start.getTime() + 13 * 86400000);
+  $("#sStart").value = localDay(start);
+  $("#sEnd").value = localDay(end);
+  $("#sHead").textContent = `${project || UNSORTED} — ${t("New Sprint", "새 스프린트")}`;
+  $("#dlgSprint").showModal();
+  $("#sName").focus();
+}
+let newSprintProject = "";
+$("#sCancel").addEventListener("click", () => $("#dlgSprint").close());
+$("#frmSprint").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    const sp = await post("/api/sprints", { project: newSprintProject, name: $("#sName").value, start: $("#sStart").value, end: $("#sEnd").value });
+    $("#dlgSprint").close();
+    sprintView.set(newSprintProject || UNSORTED, sp.id);
+    toast(t(`Sprint '${sp.name}' created`, `'${sp.name}' 스프린트를 만들었어요`));
+    refresh(true);
+  } catch (err) { toast(err.message); }
+});
+
 function exportRows() {
-  return visibleTasks().map((x) => {
+  return visibleTasks().filter(inSprintView).map((x) => {
     const sessions = x.sessions || [];
     const logs = sessions.flatMap((s) => (s.progress || []).map((p) => ({ t: p.t, msg: p.msg })))
       .sort((a, b) => String(a.t).localeCompare(String(b.t)));
     const done = sessions.map((s) => s.summary).filter(Boolean);
     return {
       project: x.project || "", id: x.id, title: x.title, status: x.status,
+      sprint: x.sprint ? sprintName(x.project, x.sprint) : "",
       description: x.description || "", sessions: sessions.length,
       last: (x.last_activity || "").replace("T", " ").split(".")[0],
       latest: logs.length ? logs[logs.length - 1].msg : "", summary: done.join(" / "), logs,
@@ -680,11 +832,11 @@ function stamp() { return new Date().toISOString().slice(0, 10); }
 
 $("#exportCsv").addEventListener("click", () => {
   const rows = exportRows();
-  const head = [t("project", "프로젝트"), t("id", "번호"), t("title", "제목"), t("status", "상태"),
+  const head = [t("project", "프로젝트"), t("sprint", "스프린트"), t("id", "번호"), t("title", "제목"), t("status", "상태"),
     t("description", "설명"), t("sessions", "세션 수"), t("last activity", "마지막 활동"),
     t("latest log", "최근 진행"), t("summary", "마무리")];
   const q = (v) => `"${String(v).replace(/"/g, '""').replace(/\r?\n/g, " ")}"`;
-  const body = rows.map((r) => [r.project, r.id, r.title, label(r.status), r.description,
+  const body = rows.map((r) => [r.project, r.sprint, r.id, r.title, label(r.status), r.description,
     r.sessions, r.last, r.latest, r.summary].map(q).join(","));
   // BOM을 붙여야 엑셀이 한글을 깨뜨리지 않는다. 구글 시트는 있어도 무방.
   const blob = new Blob(["﻿" + [head.map(q).join(","), ...body].join("\r\n")], { type: "text/csv;charset=utf-8" });
@@ -706,7 +858,7 @@ $("#exportMd").addEventListener("click", async () => {
   for (const [proj, list] of byProject) {
     out.push(`## ${proj}`, "");
     for (const r of list) {
-      out.push(`- **${r.id} ${r.title}** · ${label(r.status)}`);
+      out.push(`- **${r.id} ${r.title}** · ${label(r.status)}${r.sprint ? ` · ${r.sprint}` : ""}`);
       if (r.description) out.push(`  - ${r.description}`);
       for (const l of r.logs.slice(-3)) out.push(`  - ${String(l.t).slice(5, 10)} ${l.msg}`);
       if (r.summary) out.push(`  - ✔ ${r.summary}`);

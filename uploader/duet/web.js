@@ -74,7 +74,7 @@ function createApp(version) {
       const status = u.searchParams.get("status") || undefined;
       return run(res, () => json(res, 200, {
         tasks: core.listTasks(status).map((t) => t.toDetail()),
-        projects: core.projects(), statuses: core.TASK_STATUSES, home: core.home(),
+        projects: core.projects(), sprints: core.allSprints(), statuses: core.TASK_STATUSES, home: core.home(),
         archived: archivedCount(), version, repo: REPO_URL, page: pageStamp(version),
       }));
     }
@@ -102,6 +102,18 @@ function createApp(version) {
       const b = await readBody(req);
       return run(res, () => json(res, 201, core.createTask(b.title, b.description || "", b.project || "").toDetail()));
     }
+    if (m === "POST" && p === "/api/sprints") {
+      const b = await readBody(req);
+      return run(res, () => { const sp = core.createSprint(b.project || "", b); json(res, 201, { ...sp, note: `Sprint ${sp.name} created` }); });
+    }
+    if (m === "PATCH" && p === "/api/sprints") {
+      const b = await readBody(req);
+      return run(res, () => json(res, 200, core.updateSprint(b.project || "", b.id, b)));
+    }
+    if (m === "POST" && p === "/api/sprints/delete") {
+      const b = await readBody(req);
+      return run(res, () => json(res, 200, { deleted: core.deleteSprint(b.project || "", b.id) }));
+    }
     if (m === "POST" && p === "/api/projects/archive") {
       const b = await readBody(req);
       return run(res, () => json(res, 200, { moved: core.archiveProject(b.name || "").map((t) => t.ref), note: `Archived '${b.name || core.UNSORTED_DIRNAME}'` }));
@@ -125,6 +137,10 @@ function createApp(version) {
         return run(res, () => json(res, 200, core.updateTask(r, { title: b.title, description: b.description, project: b.project }).toDetail()));
       }
       if (m === "DELETE") return run(res, () => { const gone = core.deleteTask(r); json(res, 200, { deleted: gone, note: `Deleted ${gone}` }); });
+    }
+    if (m === "POST" && (mm = /^\/api\/tasks\/([^/]+)\/([^/]+)\/sprint$/.exec(p))) {
+      const b = await readBody(req);
+      return run(res, () => json(res, 200, core.setTaskSprint(ref(mm[1], mm[2]), b.sprint == null ? null : b.sprint).toDetail()));
     }
     if (m === "POST" && (mm = /^\/api\/tasks\/([^/]+)\/([^/]+)\/status$/.exec(p))) {
       const b = await readBody(req);
