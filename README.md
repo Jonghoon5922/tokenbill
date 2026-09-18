@@ -1,4 +1,4 @@
-# Tokenbill (토큰빌) — 내 AI 토큰, 한 화면에서
+# Tokenbill (토큰빌) — 내 AI 작업실
 
 AI는 쓰는 것으로 끝. 기록은 Tokenbill이 쌓고, 쌓인 기록은 실력이 됩니다.
 

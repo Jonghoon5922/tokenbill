@@ -851,9 +851,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # ?lang=en 공유 링크는 OG 미리보기(크롤러는 JS 미실행)도 영문이어야 한다
 _META_EN = {
     '<html lang="ko">': '<html lang="en">',
-    "Tokenbill — 내 AI 토큰 대시보드": "Tokenbill — Your AI Token Dashboard",
-    "내 AI 토큰, 한 화면에서. Claude Code·Codex·Gemini 사용량으로 겨루는 리더보드, 로컬 대화 뷰어·작업 보드, 로그가 증명하는 AI 이력서까지.":
-        "Your AI tokens, on one screen. A leaderboard for Claude Code · Codex · Gemini usage, a local transcript viewer and task board, and an AI résumé proven by your work logs.",
+    "Tokenbill — 내 AI 작업실": "Tokenbill — Your AI Workshop",
+    "내 AI 작업실. Claude Code·Codex·Gemini 사용량으로 겨루는 리더보드, 로컬 대화 뷰어·작업 보드, 로그가 증명하는 AI 이력서까지 — AI로 일한 기록이 도구가 됩니다.":
+        "Your AI workshop. A leaderboard for Claude Code · Codex · Gemini usage, a local transcript viewer and task board, and an AI résumé proven by your work logs — your AI work record, turned into tools.",
 }
 
 

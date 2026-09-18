@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tokenbill — 내 AI 토큰 대시보드</title>
-<meta name="description" content="내 AI 토큰, 한 화면에서. Claude Code·Codex·Gemini 사용량으로 겨루는 리더보드, 로컬 대화 뷰어·작업 보드, 로그가 증명하는 AI 이력서까지.">
-<meta property="og:title" content="Tokenbill — 내 AI 토큰 대시보드">
-<meta property="og:description" content="내 AI 토큰, 한 화면에서. Claude Code·Codex·Gemini 사용량으로 겨루는 리더보드, 로컬 대화 뷰어·작업 보드, 로그가 증명하는 AI 이력서까지.">
+<title>Tokenbill — 내 AI 작업실</title>
+<meta name="description" content="내 AI 작업실. Claude Code·Codex·Gemini 사용량으로 겨루는 리더보드, 로컬 대화 뷰어·작업 보드, 로그가 증명하는 AI 이력서까지 — AI로 일한 기록이 도구가 됩니다.">
+<meta property="og:title" content="Tokenbill — 내 AI 작업실">
+<meta property="og:description" content="내 AI 작업실. Claude Code·Codex·Gemini 사용량으로 겨루는 리더보드, 로컬 대화 뷰어·작업 보드, 로그가 증명하는 AI 이력서까지 — AI로 일한 기록이 도구가 됩니다.">
 <meta property="og:url" content="https://tokenbill.my">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://tokenbill.my/static/og.png">
@@ -229,7 +229,7 @@
   <div class="auth-wrap">
   <div class="auth-card">
     <h1>Token<span class="won">bill</span></h1>
-    <p class="tag">내 AI 토큰, 한 화면에서</p>
+    <p class="tag">내 AI 작업실</p>
     <div class="feat-list">
       <div>🏆 <b>리더보드</b> <span>— 이번 달 얼마나 태웠나</span></div>
       <div>🗂️ <b>대화 뷰어</b> <span>— 무슨 일을 했었나</span> <span class="loc">local</span></div>
@@ -267,7 +267,7 @@
   <header class="top">
     <div class="brand">
       <h1>Token<span class="won">bill</span></h1>
-      <span class="tag">내 AI 토큰, 한 화면에서</span>
+      <span class="tag">내 AI 작업실</span>
     </div>
     <div class="hdr-ctls">
       <details class="menu">
@@ -640,7 +640,7 @@
 
   // 정적 HTML 문구 사전 — localize()가 텍스트 노드 단위로 치환 (한국어 원문이 소스)
   var EN_TEXT = {
-    "내 AI 토큰, 한 화면에서": "Your AI tokens, on one screen",
+    "내 AI 작업실": "Your AI workshop",
     "로그인": "Log in", "회원가입": "Sign up", "또는": "or",
     "🏆 이번 달 토큰 리더보드": "🏆 This Month's Token Leaderboard",
     "지금 가입하고 순위에 도전해 보세요!": "Sign up now and claim your rank!",
@@ -740,7 +740,7 @@
     'Disconnecting deletes the key and all collected data.</p>';
 
   function localize() {
-    document.title = tr("Tokenbill — 내 AI 토큰 대시보드", "Tokenbill — Your AI Token Dashboard");
+    document.title = tr("Tokenbill — 내 AI 작업실", "Tokenbill — Your AI Workshop");
     $("langBtn").textContent = tr("🌐 EN", "🌐 한국어");
     $("langBtnAuth").textContent = tr("🌐 English", "🌐 한국어로 보기");
     if (LANG !== "en") return;
