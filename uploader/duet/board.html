@@ -369,7 +369,6 @@ const when = (stamp) => stamp ? stamp.replace("T", " ").split(".")[0].slice(5) :
   };
   if (LANG !== "ko") return;
   set("#feedback", "피드백");
-  set("#tabTasks", "타스크"); set("#tabSprints", "스프린트");
   document.querySelector("#exportCsv").title = "화면에 보이는 타스크를 CSV로 내려받기 (구글 시트·엑셀에서 열림)";
   set("#exportMd", "마크다운");
   document.querySelector("#exportMd").title = "화면에 보이는 타스크를 마크다운으로 복사";
@@ -942,11 +941,16 @@ function drawTimeline() {
     ? el("div", { className: "tl-body" }, el("div", { className: "tl-grid" }, ...rows))
     : el("div", { className: "tl-empty", textContent: t("No work in this period. Move with ◀ ▶ or pick another project.",
                                                          "이 기간에 한 일이 없어요. ◀ ▶로 옮기거나 다른 프로젝트를 골라 보세요.") });
+  // 범례는 영어로 고정. 막대 색 = 타스크 상태 색이라, 지금 화면에 나온 상태만 색 견본으로 보여준다.
+  const shownStatuses = STATUSES.filter((st) => groups.some((g) =>
+    tasks.some((x) => (x.project || "") === g && x.status === st && inRange(x))));
   const legend = el("div", { className: "tl-legend" },
-    el("span", {}, el("i", { style: "background:var(--완료)" }), document.createTextNode(t("days worked", "세션이 있던 날"))),
-    el("span", {}, el("i", { style: "background:var(--완료);opacity:.28" }), document.createTextNode(t("task span", "타스크 기간"))),
-    el("span", {}, el("i", { style: "background:var(--확인필요);width:2px" }), document.createTextNode(t("today", "오늘"))),
-    el("span", { textContent: t("Click a bar to open the task.", "막대를 누르면 타스크 탭에서 열립니다.") }));
+    ...shownStatuses.map((st) => el("span", {}, el("i", { style: `background:var(--${slug(st)})` }), document.createTextNode(LABEL[st] || st))),
+    shownStatuses.length ? el("span", { style: "color:var(--line)", textContent: "|" }) : null,
+    el("span", {}, el("i", { style: "background:var(--ink-2)" }), document.createTextNode("Days worked")),
+    el("span", {}, el("i", { style: "background:var(--ink-2);opacity:.28" }), document.createTextNode("Task span")),
+    el("span", {}, el("i", { style: "background:var(--확인필요);width:2px" }), document.createTextNode("Today")),
+    el("span", { textContent: "Click a bar to open the task." }));
   box.replaceChildren(bar, body, legend);
 }
 
