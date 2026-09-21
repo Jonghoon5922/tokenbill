@@ -40,13 +40,25 @@ function readSkillMeta(file) {
   const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
   if (fm) {
     const name = /^name:\s*(.+)$/m.exec(fm[1]);
-    const desc = /^description:\s*(.+)$/m.exec(fm[1]);
     if (name) meta.name = name[1].trim().replace(/^["']|["']$/g, "");
-    if (desc) meta.description = desc[1].trim().replace(/^["']|["']$/g, "");
+    const lines = fm[1].split(/\r?\n/);
+    const at = lines.findIndex((l) => /^description:/.test(l));
+    if (at >= 0) {
+      let v = lines[at].replace(/^description:\s*/, "").trim();
+      if (v === "|" || v === ">" || v === "|-" || v === ">-") {
+        // YAML 블록 — 들여쓴 다음 줄들이 본문이다
+        const block = [];
+        for (let i = at + 1; i < lines.length && /^\s+\S/.test(lines[i]); i++) block.push(lines[i].trim());
+        v = block.join(" ");
+      }
+      meta.description = v.replace(/^["']|["']$/g, "");
+    }
   }
   if (!meta.description) {
+    // 제목·표·목록 기호로 시작하는 줄은 설명으로 쓰지 않는다 (표로 시작하는 SKILL.md 대비)
     const body = text.replace(/^---[\s\S]*?---/, "").split(/\r?\n/)
-      .map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+      .map((l) => l.trim())
+      .filter((l) => l.length > 8 && !/^[#|>`\-*=]/.test(l));
     meta.description = (body[0] || "").slice(0, 160);
   }
   let mtime = 0, size = 0;
