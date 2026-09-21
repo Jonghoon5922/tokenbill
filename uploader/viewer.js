@@ -628,7 +628,14 @@ document.querySelectorAll(".vtabs button").forEach(function(b){
   b.addEventListener("click", function(){ setTab(b.dataset.v); });
 });
 loadList();
-try { var saved = localStorage.getItem("tb-viewer-tab"); if (saved && saved !== "chat") setTab(saved); } catch (e) {}
+// 주소의 #skill·#mcp로 바로 들어올 수 있다 (포탈 도구 메뉴가 이 주소를 쓴다)
+var fromHash = (location.hash || "").replace("#", "");
+if (fromHash === "skill" || fromHash === "mcp" || fromHash === "chat") setTab(fromHash);
+else { try { var saved = localStorage.getItem("tb-viewer-tab"); if (saved && saved !== "chat") setTab(saved); } catch (e) {} }
+window.addEventListener("hashchange", function () {
+  var v = (location.hash || "").replace("#", "");
+  if (v === "skill" || v === "mcp" || v === "chat") setTab(v);
+});
 })();
 </script></body></html>`;
 

@@ -274,6 +274,8 @@
         <summary class="btn ghost">🧰 도구 ▾</summary>
         <div class="dd">
           <a id="viewerBtn" href="http://127.0.0.1:8377" target="_blank" rel="noopener">🗂️ 대화 뷰어 <span class="loc">local</span></a>
+          <a id="skillBtn" href="http://127.0.0.1:8377/#skill" target="_blank" rel="noopener">🧩 스킬 관리 <span class="loc">local</span></a>
+          <a id="mcpBtn" href="http://127.0.0.1:8377/#mcp" target="_blank" rel="noopener">🔌 MCP 설정 <span class="loc">local</span></a>
           <a id="duetBtn" href="http://127.0.0.1:8737" target="_blank" rel="noopener">📋 작업 보드 <span class="loc">local</span></a>
           <a href="https://aicv.tokenbill.my" target="_blank" rel="noopener">📄 AICV <span class="loc">web</span></a>
         </div>
@@ -557,6 +559,8 @@
       <p><b>보너스 — 로컬 대화 뷰어</b>: MCP를 연동해두면 Claude Code가 켜져 있는 동안
       헤더 <b>🧰 도구 ▾ → [🗂️ 대화 뷰어]</b>로 과거 대화(입력·출력·도구 호출)를 열람·검색할 수 있습니다
       — Claude Code·Codex·Gemini CLI에 <b>Cursor</b>까지 지원합니다.
+      같은 메뉴의 <b>[🧩 스킬 관리]</b>는 PC에 흩어진 스킬(SKILL.md)을 모아 보여주고 Claude Code가 읽는 자리로 설치해 주며,
+      <b>[🔌 MCP 설정]</b>은 등록된 MCP를 토큰을 가린 채 보여주고 다른 PC용 설정을 내보냅니다.
       CLI가 꺼져 있을 땐 <code>npx -y tokenbill-mcp@latest --viewer</code>로 직접 실행하세요.
       뷰어는 내 PC(127.0.0.1) 안에서만 로그를 읽으며 어떤 데이터도 업로드되지 않습니다.</p>
       <p>토큰이 유출된 것 같으면 마이페이지에서 <b>재발급</b>하세요 (이전 토큰 즉시 무효).
@@ -676,6 +680,7 @@
     "구독 사용량 연동 (MCP)": "Subscription usage sync (MCP)",
     "회원 탈퇴": "Delete account",
     "🗂️ 대화 뷰어": "🗂️ Transcripts",
+    "🧩 스킬 관리": "🧩 Skills", "🔌 MCP 설정": "🔌 MCP",
     "📋 작업 보드": "📋 Task board",
     "확인했어요": "Got it",
     "계정 시점으로 보는 중입니다": "— viewing as this user",
@@ -1039,7 +1044,6 @@
       .then(function () { clearTimeout(timer); viewerAlive = true; if (cb) cb(true); })
       .catch(function () { clearTimeout(timer); viewerAlive = false; if (cb) cb(false); });
   }
-  $("viewerBtn").addEventListener("mouseenter", function () { pingViewer(); });
   // 작업 보드(Duet)도 같은 패턴 — 살아있으면 링크 그대로, 아니면 안내 토스트
   var duetAlive = null;
   function pingDuet(cb) {
@@ -1056,12 +1060,17 @@
                         "If the new tab shows an error, the board isn't running — (re)start Claude Code with MCP set up and it launches automatically."));
     });
   });
-  $("viewerBtn").addEventListener("click", function (ev) {
-    if (viewerAlive === true) return;  // 확인됨 — 링크 그대로 새 탭
-    ev.preventDefault();
-    pingViewer(function (ok) {
-      if (ok) window.open("http://127.0.0.1:8377", "_blank");
-      else $("viewerHelp").classList.remove("hidden");
+  // 뷰어를 여는 링크 3개(대화·스킬·MCP)는 같은 로컬 서버라 동작이 같다
+  ["viewerBtn", "skillBtn", "mcpBtn"].forEach(function (id) {
+    var a = $(id);
+    a.addEventListener("mouseenter", function () { pingViewer(); });
+    a.addEventListener("click", function (ev) {
+      if (viewerAlive === true) return;  // 확인됨 — 링크 그대로 새 탭
+      ev.preventDefault();
+      pingViewer(function (ok) {
+        if (ok) window.open(a.href, "_blank");
+        else $("viewerHelp").classList.remove("hidden");
+      });
     });
   });
 
