@@ -537,20 +537,33 @@ function renderSkills(){
   box.textContent = "";
   var head = el("div","tb-head");
   head.appendChild(el("h2","","스킬 " + tb.skills.length + "개"));
-  head.appendChild(el("span","note2","설치 자리: " + tb.installed_dir + " — 여기에 있어야 Claude Code가 읽습니다"));
+  head.appendChild(el("span","note2","Claude Code가 공식적으로 읽는 자리만 보여줍니다 — 개인(" + tb.installed_dir + ") · 프로젝트(.claude/skills) · 플러그인"));
   box.appendChild(head);
+  if (!tb.skills.length) {
+    box.appendChild(el("p","empty","아직 Claude Code 스킬이 없어요. " + tb.installed_dir + "/<이름>/SKILL.md 로 두면 어느 폴더에서든 읽힙니다."));
+    return;
+  }
+  // 개인 → 프로젝트 → 플러그인 순서
+  var ORDER = { personal: 0, project: 1, plugin: 2 };
   var groups = {};
-  tb.skills.forEach(function(s){ (groups[s.installed ? "설치됨" : s.origin] = groups[s.installed ? "설치됨" : s.origin] || []).push(s); });
-  Object.keys(groups).sort(function(a,b){ return a === "설치됨" ? -1 : b === "설치됨" ? 1 : a.localeCompare(b,"ko"); })
+  tb.skills.forEach(function(s){ (groups[s.origin] = groups[s.origin] || []).push(s); });
+  Object.keys(groups).sort(function(a,b){
+    return (ORDER[groups[a][0].source] - ORDER[groups[b][0].source]) || a.localeCompare(b,"ko");
+  })
   .forEach(function(g){
     box.appendChild(el("div","tb-group", g + " · " + groups[g].length));
     groups[g].forEach(function(s){
       var nm = el("div","nm");
       nm.appendChild(document.createTextNode(s.name));
-      if (s.installed) nm.appendChild(badge("설치됨","ok"));
+      if (s.source === "personal") nm.appendChild(badge("어디서나 사용","ok"));
+      if (s.source === "project") nm.appendChild(badge("이 폴더에서만"));
+      if (s.source === "plugin") nm.appendChild(badge("플러그인"));
       if (s.copies.length) nm.appendChild(badge("사본 " + s.copies.length));
       if (s.files.length) nm.appendChild(badge(s.files.join(", ").slice(0,40)));
-      var btn = el("button","btn2" + (s.installed ? "" : " primary"), s.installed ? "제거" : "설치");
+      // 플러그인 스킬은 플러그인이 관리한다 — 여기서 건드리지 않는다
+      if (s.source === "plugin") { box.appendChild(card(nm, s.description, s.dir_short, [])); return; }
+      var btn = el("button","btn2" + (s.installed ? "" : " primary"), s.installed ? "제거" : "어디서나 쓰기");
+      btn.title = s.installed ? "개인 스킬 폴더에서 지웁니다" : "개인 스킬 폴더(" + tb.installed_dir + ")로 복사해 어느 폴더에서든 쓰게 합니다";
       btn.addEventListener("click", function(){
         if (s.installed) {
           if (!confirm(s.name + " 스킬을 " + tb.installed_dir + " 에서 지울까요?")) return;

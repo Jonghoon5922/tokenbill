@@ -81,17 +81,19 @@ function claudeProjects() {
 }
 
 // ── 스킬 모으기 ─────────────────────────────────────────────
+// Claude Code가 공식적으로 스킬을 읽는 자리만 본다.
+//   개인:     ~/.claude/skills/<이름>/SKILL.md        — 어느 폴더에서 열든 읽힘
+//   프로젝트: <저장소>/.claude/skills/<이름>/SKILL.md — 그 폴더에서 열 때만 읽힘
+//   플러그인: ~/.claude/plugins/…/skills/<이름>/SKILL.md
+// 다른 도구의 스킬 폴더나 내려받은 폴더는 Claude Code가 읽지 않으므로 목록에 넣지 않는다.
 function scanSkills() {
   const roots = [
-    { root: SKILLS_HOME, depth: 2, source: "installed", label: "설치됨 (Claude Code)" },
-    { root: path.join(HOME, ".claude", "plugins"), depth: 5, source: "plugin", label: "플러그인" },
-    { root: path.join(HOME, ".bxca", "assistant-skills"), depth: 3, source: "bxca", label: "회사 어시스턴트" },
-    { root: path.join(HOME, ".bxcabackup", "assistant-skills"), depth: 3, source: "bxca", label: "회사 어시스턴트 (백업)" },
-    { root: path.join(HOME, "Downloads"), depth: 6, source: "folder", label: "내려받은 폴더" },
-    { root: path.join(HOME, "Documents"), depth: 5, source: "folder", label: "문서 폴더" },
+    { root: SKILLS_HOME, depth: 2, source: "personal", label: "개인 — 어디서 열든" },
+    { root: path.join(HOME, ".claude", "plugins"), depth: 6, source: "plugin", label: "플러그인" },
   ];
   for (const p of claudeProjects()) {
-    roots.push({ root: path.join(p, ".claude", "skills"), depth: 2, source: "project", label: `프로젝트 — ${path.basename(p)}` });
+    roots.push({ root: path.join(p, ".claude", "skills"), depth: 2, source: "project",
+      label: `프로젝트 — ${path.basename(p)}에서 열 때만`, project: short(p) });
   }
 
   const found = [], seenDir = new Set();
@@ -102,8 +104,10 @@ function scanSkills() {
       seenDir.add(dir);
       const meta = readSkillMeta(file);
       if (!meta) continue;
-      found.push({ ...meta, source: r.source, origin: r.label, dir_short: short(dir),
-        installed: dir.toLowerCase().startsWith(SKILLS_HOME.toLowerCase()) });
+      // 플러그인 폴더에서는 skills/ 아래 것만 스킬이다 (다른 SKILL.md 사본 제외)
+      if (r.source === "plugin" && path.basename(path.dirname(dir)) !== "skills") continue;
+      found.push({ ...meta, source: r.source, origin: r.label, dir_short: short(dir), project: r.project || "",
+        installed: r.source === "personal" });
     }
   }
   // 같은 스킬이 여러 자리에 있으면 하나로 묶는다 (이름 기준, 사본 목록을 함께)
@@ -218,6 +222,10 @@ function copyDir(from, to) {
 function installSkill(dir, { overwrite = false } = {}) {
   const src = path.resolve(String(dir || ""));
   if (!fs.existsSync(path.join(src, "SKILL.md"))) throw new Error("SKILL.md가 없는 폴더입니다");
+  // Claude Code 공식 자리(프로젝트의 .claude/skills)에 있는 것만 개인 폴더로 옮긴다
+  const official = claudeProjects().some((p) =>
+    src.toLowerCase().startsWith(path.resolve(p, ".claude", "skills").toLowerCase() + path.sep));
+  if (!official) throw new Error("Claude Code 스킬 폴더(.claude/skills)에 있는 스킬만 옮길 수 있습니다");
   const meta = readSkillMeta(path.join(src, "SKILL.md"));
   const dest = destFor(meta.name);
   const exists = fs.existsSync(dest);

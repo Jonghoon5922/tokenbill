@@ -10,12 +10,11 @@ Downloads 리뷰패키지 안에 묻혀 있었다). 흩어진 것을 한 화면�
 ## P1 — 찾아내기 (scan) [x]
 
 `uploader/toolbox.js`:
-- 스킬: 아래 자리에서 `SKILL.md`를 찾아 이름·설명(frontmatter)·출처·수정일을 모은다
-  - `~/.claude/skills/*/SKILL.md` (Claude Code 개인 — "설치됨")
-  - `~/.claude/plugins/**/skills/*/SKILL.md` (플러그인)
-  - `~/.bxca/assistant-skills/*/*/SKILL.md`, `~/.bxcabackup/...` (회사 어시스턴트)
-  - Claude Code가 기억하는 프로젝트 폴더(`~/.claude.json`의 projects 키)의 `.claude/skills/*`
-  - `~/Downloads` 등 일반 폴더는 깊이 제한을 두고 훑는다 (node_modules·.git 제외)
+- 스킬: **Claude Code가 공식적으로 읽는 자리만** 본다 (2026-09-21 결정 — 다른 도구·내려받은 폴더는 제외)
+  - `~/.claude/skills/*/SKILL.md` (개인 — 어디서 열든 읽힘)
+  - Claude Code가 기억하는 프로젝트 폴더(`~/.claude.json`의 projects 키)의 `.claude/skills/*` (그 폴더에서만)
+  - `~/.claude/plugins/**/skills/*/SKILL.md` (플러그인 — 읽기 전용, 여기서 건드리지 않음)
+  - [어디서나 쓰기]는 프로젝트 스킬을 개인 폴더로 복사. 공식 자리 밖 폴더는 API에서도 거절
 - MCP: `~/.claude.json`의 `mcpServers`(사용자 전역) + `projects[*].mcpServers`(폴더 한정)
   + 프로젝트 폴더의 `.mcp.json`. **토큰·키로 보이는 값은 즉시 마스킹**해서 내보낸다.
 - 중복은 (이름, 내용 해시)로 묶어 "같은 스킬이 여기저기 있음"을 보여준다.

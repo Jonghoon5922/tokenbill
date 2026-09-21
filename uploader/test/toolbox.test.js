@@ -24,3 +24,15 @@ test("스캔 결과에는 원문 토큰이 없다", () => {
   const raw = JSON.stringify(tb.scanMcp());
   assert.ok(!/tbu_[A-Za-z0-9_-]{10,}/.test(raw) && !/acv_[A-Za-z0-9_-]{10,}/.test(raw));
 });
+
+test("Claude Code 스킬 폴더 밖(내려받은 폴더 등)의 스킬은 옮기지 않는다", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "loose-"));
+  fs.writeFileSync(path.join(dir, "SKILL.md"), "---\nname: loose-skill\ndescription: 아무 데나 있는 스킬\n---\n");
+  assert.throws(() => tb.installSkill(dir), /\.claude\/skills/);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("스캔 결과는 개인·프로젝트·플러그인 출처만 담는다", () => {
+  const { skills } = tb.scanSkills();
+  for (const s of skills) assert.ok(["personal", "project", "plugin"].includes(s.source), s.source);
+});
