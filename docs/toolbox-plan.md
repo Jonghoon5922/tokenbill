@@ -1,0 +1,38 @@
+# 스킬·MCP 관리기 (tokenbill/T011)
+
+AI를 오래 쓸수록 스킬과 MCP 설정이 PC 여기저기 흩어진다(실제로 nefss 스킬 7개가
+Downloads 리뷰패키지 안에 묻혀 있었다). 흩어진 것을 한 화면에 모아 보고, 쓰는 자리로
+옮기고, 다른 PC·팀원에게 넘길 수 있게 한다. 전부 로컬에서만 동작한다.
+
+**어디에 붙나**: 로컬 뷰어(127.0.0.1:8377)에 탭을 더한다 — `대화` / `스킬` / `MCP`.
+서버(tokenbill.my)는 아무것도 모른다. 파일은 읽기 위주이고, 쓰기는 `~/.claude/skills` 안으로만.
+
+## P1 — 찾아내기 (scan) [x]
+
+`uploader/toolbox.js`:
+- 스킬: 아래 자리에서 `SKILL.md`를 찾아 이름·설명(frontmatter)·출처·수정일을 모은다
+  - `~/.claude/skills/*/SKILL.md` (Claude Code 개인 — "설치됨")
+  - `~/.claude/plugins/**/skills/*/SKILL.md` (플러그인)
+  - `~/.bxca/assistant-skills/*/*/SKILL.md`, `~/.bxcabackup/...` (회사 어시스턴트)
+  - Claude Code가 기억하는 프로젝트 폴더(`~/.claude.json`의 projects 키)의 `.claude/skills/*`
+  - `~/Downloads` 등 일반 폴더는 깊이 제한을 두고 훑는다 (node_modules·.git 제외)
+- MCP: `~/.claude.json`의 `mcpServers`(사용자 전역) + `projects[*].mcpServers`(폴더 한정)
+  + 프로젝트 폴더의 `.mcp.json`. **토큰·키로 보이는 값은 즉시 마스킹**해서 내보낸다.
+- 중복은 (이름, 내용 해시)로 묶어 "같은 스킬이 여기저기 있음"을 보여준다.
+
+## P2 — 화면 [x]
+
+- 뷰어에 탭 추가. 스킬 탭: 출처별 묶음, 설치 여부 배지, 검색, 내용 미리보기(SKILL.md 앞부분)
+- MCP 탭: 서버 목록(범위·명령·마스킹된 인자), 등록 명령 복사
+
+## P3 — 옮기기·내보내기 [x]  (zip 대신 폴더 복사 + MCP 템플릿)
+
+- `[설치]` — 스킬 폴더를 `~/.claude/skills/<이름>`으로 복사 (이미 있으면 덮어쓸지 확인)
+- `[제거]` — `~/.claude/skills` 안의 것만
+- `[다른 PC용 내보내기]` — 선택한 스킬을 zip 없이 폴더 복사 경로 안내 + MCP는
+  토큰을 `${TOKENBILL_TOKEN}` 같은 자리표시자로 바꾼 `.mcp.json` 템플릿 저장
+- 쓰기 경로는 `~/.claude/skills` 밖으로 절대 나가지 않게 검증
+
+## P4 — 마무리 [ ]
+
+- 단위 테스트(스캔·마스킹·경로 검증), README·가이드 한 줄, npm 버전 올려 배포

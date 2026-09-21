@@ -10,6 +10,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const http = require("http");
+const toolbox = require("./toolbox");
 
 const BASES = {
   "claude-code": path.join(os.homedir(), ".claude", "projects"),
@@ -328,6 +329,31 @@ header .note{font-size:.72rem;color:var(--muted)}
 #filters select{padding:5px 9px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);font:inherit;font-size:.75rem;max-width:220px}
 #sum{margin-left:auto;font-size:.73rem;color:var(--muted);font-variant-numeric:tabular-nums}
 main{flex:1;display:flex;min-height:0}
+.hidden{display:none!important}
+.vtabs{display:flex;gap:2px;margin-left:8px}
+.vtabs button{border:0;background:none;font:inherit;font-size:.86rem;font-weight:600;color:var(--muted);padding:6px 12px;
+  border-bottom:2px solid transparent;cursor:pointer}
+.vtabs button.on{color:var(--accent-ink);border-bottom-color:var(--accent)}
+#toolbox{flex:1;overflow-y:auto;padding:18px 22px}
+.tb-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.tb-head h2{font-size:1rem;font-weight:700}
+.tb-head .note2{font-size:.76rem;color:var(--muted)}
+.tb-group{font-size:.74rem;font-weight:700;color:var(--muted);margin:16px 0 6px;letter-spacing:.03em}
+.tb-card{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:11px 14px;margin-bottom:7px;
+  display:flex;gap:12px;align-items:flex-start}
+.tb-card .body{flex:1;min-width:0}
+.tb-card .nm{font-size:.86rem;font-weight:600;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.tb-card .ds{font-size:.76rem;color:var(--ink-2);margin-top:3px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.tb-card .pth{font-size:.68rem;color:var(--muted);font-family:ui-monospace,Consolas,monospace;margin-top:4px;word-break:break-all}
+.tb-badge{font-size:.62rem;border-radius:999px;padding:1px 8px;border:1px solid var(--border);color:var(--muted)}
+.tb-badge.ok{background:color-mix(in srgb,var(--good-ink) 12%,transparent);color:var(--good-ink);border-color:transparent}
+.tb-badge.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn-ink);border-color:transparent}
+.tb-pre{background:var(--chip);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:.7rem;
+  font-family:ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all;margin-top:8px}
+.btn2{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:7px;padding:5px 11px;
+  font:inherit;font-size:.76rem;font-weight:600;cursor:pointer;flex:none}
+.btn2:hover{background:var(--chip)}
+.btn2.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 #side{width:360px;flex:none;border-right:1px solid var(--grid);overflow-y:auto;padding:8px;background:var(--page)}
 .sess{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border-radius:9px;border:1px solid var(--border);border-left:3px solid var(--grid);cursor:pointer;margin-bottom:5px;background:var(--surface)}
 .sess:hover{background:var(--chip)}.sess.on{background:color-mix(in srgb,var(--accent) 10%,var(--surface));border-color:color-mix(in srgb,var(--accent) 40%,var(--border))}
@@ -350,8 +376,11 @@ main{flex:1;display:flex;min-height:0}
 .sumcard .bigtok{margin-left:auto;font-size:.95rem;font-weight:700;color:var(--accent-ink);font-variant-numeric:tabular-nums}
 @media(max-width:760px){#side{width:220px}}
 </style></head><body>
-<header><h1>Token<b>bill</b> 로컬 뷰어</h1>
-<span class="note">이 PC의 로그만 읽습니다 — 아무것도 업로드되지 않아요</span>
+<header><h1>Token<b>bill</b> <span id="hTitle">로컬 뷰어</span></h1>
+<span class="note">이 PC의 것만 읽습니다 — 아무것도 업로드되지 않아요</span>
+<nav class="vtabs">
+  <button data-v="chat" class="on">대화</button><button data-v="skill">스킬</button><button data-v="mcp">MCP</button>
+</nav>
 <input id="q" placeholder="대화 내용 검색 (Enter)"></header>
 <div id="filters">
   <span id="chips"></span>
@@ -364,6 +393,7 @@ main{flex:1;display:flex;min-height:0}
   <span id="sum"></span>
 </div>
 <main><div id="side"></div><div id="view"><p class="empty">왼쪽에서 세션을 선택하세요</p></div></main>
+<section id="toolbox" class="hidden"></section>
 <script>
 (function(){
 "use strict";
@@ -474,7 +504,131 @@ function loadSession(s){
 projSel.addEventListener("change",function(){F.proj=this.value;refresh()});
 perSel.addEventListener("change",function(){F.per=this.value;refresh()});
 qIn.addEventListener("keydown",function(ev){if(ev.key==="Enter")refresh()});
+/* ── 스킬·MCP 관리기 ── */
+function toast(msg){
+  var t = document.getElementById("tbToast");
+  if (!t) { t = el("div",""); t.id = "tbToast"; document.body.appendChild(t);
+    t.style.cssText = "position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--page);"
+      + "padding:9px 16px;border-radius:8px;font-size:.82rem;z-index:30;max-width:80vw;text-align:center"; }
+  t.textContent = msg; t.style.display = "block";
+  clearTimeout(t._h); t._h = setTimeout(function(){ t.style.display = "none"; }, 3200);
+}
+var tb = null;   // 서버에서 받은 스캔 결과
+function tbLoad(force){
+  if (tb && !force) return Promise.resolve(tb);
+  return fetch("/api/toolbox").then(function(r){return r.json()}).then(function(j){ tb = j; return j; });
+}
+function tbPost(path, body){
+  return fetch(path, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) })
+    .then(function(r){ return r.json(); });
+}
+function badge(text, cls){ var b = el("span","tb-badge"+(cls?" "+cls:""),text); return b; }
+function card(nameNode, desc, pathText, actions){
+  var c = el("div","tb-card"), body = el("div","body");
+  body.appendChild(nameNode);
+  if (desc) body.appendChild(el("div","ds",desc));
+  if (pathText) body.appendChild(el("div","pth",pathText));
+  c.appendChild(body);
+  (actions||[]).forEach(function(a){ c.appendChild(a); });
+  return c;
+}
+function renderSkills(){
+  var box = document.getElementById("toolbox");
+  box.textContent = "";
+  var head = el("div","tb-head");
+  head.appendChild(el("h2","","스킬 " + tb.skills.length + "개"));
+  head.appendChild(el("span","note2","설치 자리: " + tb.installed_dir + " — 여기에 있어야 Claude Code가 읽습니다"));
+  box.appendChild(head);
+  var groups = {};
+  tb.skills.forEach(function(s){ (groups[s.installed ? "설치됨" : s.origin] = groups[s.installed ? "설치됨" : s.origin] || []).push(s); });
+  Object.keys(groups).sort(function(a,b){ return a === "설치됨" ? -1 : b === "설치됨" ? 1 : a.localeCompare(b,"ko"); })
+  .forEach(function(g){
+    box.appendChild(el("div","tb-group", g + " · " + groups[g].length));
+    groups[g].forEach(function(s){
+      var nm = el("div","nm");
+      nm.appendChild(document.createTextNode(s.name));
+      if (s.installed) nm.appendChild(badge("설치됨","ok"));
+      if (s.copies.length) nm.appendChild(badge("사본 " + s.copies.length));
+      if (s.files.length) nm.appendChild(badge(s.files.join(", ").slice(0,40)));
+      var btn = el("button","btn2" + (s.installed ? "" : " primary"), s.installed ? "제거" : "설치");
+      btn.addEventListener("click", function(){
+        if (s.installed) {
+          if (!confirm(s.name + " 스킬을 " + tb.installed_dir + " 에서 지울까요?")) return;
+          tbPost("/api/skills/remove", { name: s.name }).then(function(r){
+            toast(r.error ? r.error : s.name + " 제거됨"); tbLoad(true).then(renderSkills);
+          });
+        } else {
+          tbPost("/api/skills/install", { dir: s.dir }).then(function(r){
+            if (r.exists && !r.ok) {
+              if (!confirm(s.name + " 이(가) 이미 있습니다. 덮어쓸까요?")) return;
+              return tbPost("/api/skills/install", { dir: s.dir, overwrite: true }).then(function(r2){
+                toast(r2.error ? r2.error : s.name + " 설치됨"); tbLoad(true).then(renderSkills);
+              });
+            }
+            toast(r.error ? r.error : s.name + " 설치됨 → " + r.dest);
+            tbLoad(true).then(renderSkills);
+          });
+        }
+      });
+      box.appendChild(card(nm, s.description, s.dir_short, [btn]));
+    });
+  });
+}
+function renderMcp(){
+  var box = document.getElementById("toolbox");
+  box.textContent = "";
+  var head = el("div","tb-head");
+  head.appendChild(el("h2","","MCP " + tb.servers.length + "개"));
+  head.appendChild(el("span","note2","설정 파일: " + tb.config + " · 토큰은 가려서 보여줍니다"));
+  box.appendChild(head);
+  var SCOPE = { user: "사용자 전역", local: "이 폴더에서만", project: "저장소 공유(.mcp.json)" };
+  tb.servers.forEach(function(s){
+    var nm = el("div","nm");
+    nm.appendChild(document.createTextNode(s.name));
+    nm.appendChild(badge(SCOPE[s.scope] || s.scope));
+    if (s.has_secret) nm.appendChild(badge("토큰 포함","warn"));
+    var cmd = s.command + " " + (s.args || []).join(" ");
+    var btn = el("button","btn2","등록 명령 복사");
+    btn.addEventListener("click", function(){
+      var line = "claude mcp add -s user " + s.name + " -- " + cmd;
+      if (navigator.clipboard) navigator.clipboard.writeText(line).then(function(){ toast("복사됨 — 토큰 자리는 직접 채우세요"); });
+    });
+    box.appendChild(card(nm, cmd, s.where, [btn]));
+  });
+  var tHead = el("div","tb-group","다른 PC로 옮기기");
+  box.appendChild(tHead);
+  var note = el("div","ds","아래 내용을 저장소의 .mcp.json 으로 저장하면 팀원·다른 PC가 같은 MCP를 씁니다. 토큰은 환경변수 자리표시자로 바꿔 두었습니다.");
+  box.appendChild(note);
+  var pre = el("pre","tb-pre","불러오는 중…");
+  box.appendChild(pre);
+  fetch("/api/mcp/template").then(function(r){return r.json()}).then(function(j){
+    pre.textContent = JSON.stringify(j, null, 2);
+  });
+  var copy = el("button","btn2","템플릿 복사");
+  copy.style.marginTop = "8px";
+  copy.addEventListener("click", function(){
+    if (navigator.clipboard) navigator.clipboard.writeText(pre.textContent).then(function(){ toast("템플릿 복사됨"); });
+  });
+  box.appendChild(copy);
+}
+var TITLES = { chat: "로컬 뷰어", skill: "스킬 관리", mcp: "MCP 설정" };
+function setTab(v){
+  document.querySelectorAll(".vtabs button").forEach(function(b){ b.classList.toggle("on", b.dataset.v === v); });
+  var chat = v === "chat";
+  document.querySelector("main").classList.toggle("hidden", !chat);
+  document.getElementById("filters").classList.toggle("hidden", !chat);
+  document.getElementById("q").classList.toggle("hidden", !chat);
+  document.getElementById("toolbox").classList.toggle("hidden", chat);
+  document.getElementById("hTitle").textContent = TITLES[v];
+  try { localStorage.setItem("tb-viewer-tab", v); } catch (e) {}
+  if (!chat) tbLoad().then(v === "skill" ? renderSkills : renderMcp)
+    .catch(function(){ document.getElementById("toolbox").textContent = "불러오지 못했습니다"; });
+}
+document.querySelectorAll(".vtabs button").forEach(function(b){
+  b.addEventListener("click", function(){ setTab(b.dataset.v); });
+});
 loadList();
+try { var saved = localStorage.getItem("tb-viewer-tab"); if (saved && saved !== "chat") setTab(saved); } catch (e) {}
 })();
 </script></body></html>`;
 
@@ -525,6 +679,30 @@ function start(port, opts) {
       if (u.pathname === "/api/search") {
         const q = (u.searchParams.get("q") || "").trim();
         return json(res, q.length >= 2 ? searchSessions(q) : []);
+      }
+      // ── 스킬·MCP 관리기 (전부 이 PC 안에서만) ──
+      if (u.pathname === "/api/toolbox") {
+        return json(res, { ...toolbox.scanSkills(), ...toolbox.scanMcp() });
+      }
+      if (u.pathname === "/api/mcp/template") {
+        const names = (u.searchParams.get("names") || "").split(",").map((s) => s.trim()).filter(Boolean);
+        return json(res, toolbox.mcpTemplate(names));
+      }
+      if (req.method === "POST" && (u.pathname === "/api/skills/install" || u.pathname === "/api/skills/remove")) {
+        let body = "";
+        req.on("data", (c) => { body += c; if (body.length > 1e5) req.destroy(); });
+        return req.on("end", () => {
+          try {
+            const b = JSON.parse(body || "{}");
+            const out = u.pathname.endsWith("install")
+              ? toolbox.installSkill(b.dir, { overwrite: !!b.overwrite })
+              : toolbox.removeSkill(b.name);
+            json(res, out);
+          } catch (e) {
+            res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ error: String(e.message || e) }));
+          }
+        });
       }
       res.writeHead(404); res.end("not found");
     } catch (e) {
